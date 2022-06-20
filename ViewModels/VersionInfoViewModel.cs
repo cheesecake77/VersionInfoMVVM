@@ -16,10 +16,12 @@ using Avalonia.Data.Converters;
 using System.Globalization;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
+using Avalonia;
+using Avalonia.Platform;
+using System.Reflection;
 
 namespace VersionInfoMVVM.ViewModels 
 {
-    // HIGHPRIORITY: залить на git
     // TODO: всплывающие окна с предложением сохранить после Create, Exit и Open
     // AFTERWARDS: вынести стилизацию в отдельный файл
     // TODO: прерывание операций Сравнение и Обновление
@@ -164,9 +166,9 @@ namespace VersionInfoMVVM.ViewModels
             });
             OnCheckButton = ReactiveCommand.Create(() => 
             {
-                // TODO: проверить check
+                // TODO: проверить check, исправить ветку для измененных файлов, добавить обработку файлов с состоянием Unknown
                 var newList = new ObservableCollection<BaseDescription>();
-                Task.Run(() =>
+                _ = Task.Run(() =>
                 {
                     if (DirectoryData != null)
                         foreach (var d in DirectoryData)
@@ -175,12 +177,13 @@ namespace VersionInfoMVVM.ViewModels
                             FindFiles(d, newList);
                         }
 
-                    var temp_list = new ObservableCollection<BaseDescription>(FileData);    
-                    foreach(FileDescription file in temp_list.Where(f => f is FileDescription))
+                    var temp_list = new ObservableCollection<BaseDescription>(FileData);
+                    foreach (FileDescription file in temp_list.Where(f => f is FileDescription))
                     {
-                        Dispatcher.UIThread.InvokeAsync(() => {
+                        Dispatcher.UIThread.InvokeAsync(() =>
+                        {
                             var found = newList.FirstOrDefault(t => t.Path == file.Path);
-                            if(found == null)
+                            if (found == null)
                             {
                                 file.FileState = FileState.Deleted;
                                 FileData = temp_list;
@@ -190,7 +193,8 @@ namespace VersionInfoMVVM.ViewModels
 
                     foreach (FileDescription file in newList.Where(f => f is FileDescription))
                     {
-                        Dispatcher.UIThread.InvokeAsync(() => {
+                        Dispatcher.UIThread.InvokeAsync(() =>
+                        {
                             var found = FileData.FirstOrDefault(t => t.Path == file.Path);
                             if (found == null)
                             {
@@ -204,14 +208,26 @@ namespace VersionInfoMVVM.ViewModels
                     {
                         var found = (FileDescription)temp_list.FirstOrDefault(t => t.Path == file.Path);
                         if (found != null)
+                        {
+                            var debug = found.Equals(file);
                             if (!found.Equals(file)) 
-                                found.FileState = FileState.Modified; 
+                            {
+                                found.Time = file.Time;
+                                found.Size = file.Size;
+                                found.Hash = file.Hash;
+                                found.Version = file.Version;
+                                found.FileState = FileState.Modified;
+
+                            }
+                        }
                     }
 
                     FileData = temp_list;
 
-                }).ContinueWith(t => {
-                    StatusBarText = "Готово";});
+                }).ContinueWith(t =>
+                {
+                    StatusBarText = "Готово";
+                });
 
             });
             
@@ -286,32 +302,33 @@ namespace VersionInfoMVVM.ViewModels
             return value;
         }
     }
-    // FIX: убрать полный путь в bitmap
     public class FileStateConverterToImage : IValueConverter
     {
         public static readonly FileStateConverterToImage Instance = new();
         object? IValueConverter.Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         {
+            var assets = AvaloniaLocator.Current.GetService<IAssetLoader>();
+            string assemblyName = Assembly.GetEntryAssembly().GetName().Name;
             if (value is FileState fileState)
             switch (fileState)
                 {
                     case FileState.Ok:
-                        return new Bitmap(@"C:\Users\vasya\source\repos\VersionInfoMVVM\VersionInfoMVVM\Assets\ok.png");
+                        return new Bitmap(assets.Open(new Uri($"avares://{assemblyName}/Assets/ok.png")));
 
                     case FileState.Unknown:
-                        return new Bitmap(@"C:\Users\vasya\source\repos\VersionInfoMVVM\VersionInfoMVVM\Assets\unknown.png");
+                        return new Bitmap(assets.Open(new Uri($"avares://{assemblyName}/Assets/unknown.png")));
 
                     case FileState.Deleted:
-                        return new Bitmap(@"C:\Users\vasya\source\repos\VersionInfoMVVM\VersionInfoMVVM\Assets\deleted.png");
+                        return new Bitmap(assets.Open(new Uri($"avares://{assemblyName}/Assets/deleted.png")));
 
                     case FileState.Modified:
-                        return new Bitmap(@"C:\Users\vasya\source\repos\VersionInfoMVVM\VersionInfoMVVM\Assets\modified.png");
+                        return new Bitmap(assets.Open(new Uri($"avares://{assemblyName}/Assets/modified.png")));
 
                     case FileState.Added:
-                        return new Bitmap(@"C:\Users\vasya\source\repos\VersionInfoMVVM\VersionInfoMVVM\Assets\added.png");
+                        return new Bitmap(assets.Open(new Uri($"avares://{assemblyName}/Assets/added.png")));
 
                     default:
-                        return new Bitmap(@"C:\Users\vasya\source\repos\VersionInfoMVVM\VersionInfoMVVM\Assets\ok.png");
+                        return new Bitmap(assets.Open(new Uri($"avares://{assemblyName}/Assets/exception.png")));
                 }
             return value;
         }

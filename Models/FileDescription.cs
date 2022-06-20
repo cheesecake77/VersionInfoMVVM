@@ -67,14 +67,13 @@ namespace VersionInfoMVVM.Models
 
         public bool Equals(FileDescription? other)
         {
+            // TODO: исправить проверку времени
             if (other == null) return false;
-
-            if (this.Size == other.Size
-                && this.Time == other.Time
-                && this.Version == other.Version
-                && this.Hash == other.Hash) return true;
-
-            return false;
+            if (this.Size != other.Size) return false;
+            //if (this.Time != other.Time) return false;
+            if (this.Version != other.Version) return false;
+            if (this.Hash != other.Hash) return false;
+            return true;
         }
     }
 
