@@ -1,0 +1,93 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:model ="using:VersionInfoMVVM.Models"
+             xmlns:local="clr-namespace:VersionInfoMVVM.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+             x:Class="VersionInfoMVVM.Views.VersionInfoView">
+  <UserControl.Resources>
+    <local:FileStateConverterToString x:Key="fileStateConverterToString"/>
+    <local:FileStateConverterToImage x:Key="fileStateConverterToImage"/>
+    <local:IsDirectoryFontConverter x:Key="isDirectoryToFont"/>
+  </UserControl.Resources>
+  <DockPanel >
+  <Menu DockPanel.Dock="Top" Height="20">
+    <MenuItem Header="Файл">
+      <MenuItem IsEnabled="True" Header="Открыть" Command="{Binding OnOpenItem}"/>
+      <MenuItem Header="Создать" Command="{Binding OnCreateItem}"/>
+      <MenuItem Header="Сохранить" Command="{Binding OnSaveItem}"/>
+      <MenuItem Header="Сохранить как" Command="{Binding OnSaveAsItem}"/>
+      <MenuItem Header="Экспортировать">
+        <MenuItem Header="Экспортировать в .txt"></MenuItem>
+        <MenuItem Header="Экспортировать в .csv"></MenuItem>
+        <MenuItem Header="Экспортировать в .docx"></MenuItem>
+        <MenuItem Header="Экспортировать в .xlsx"></MenuItem>
+      </MenuItem>
+      <MenuItem Header="Выйти" Command="{Binding OnCloseItem}"/>
+    </MenuItem>
+  </Menu>
+
+  <TextBlock Height="20" DockPanel.Dock="Bottom" Text="{Binding StatusBarText, Mode=TwoWay}"></TextBlock>
+
+  <Grid RowDefinitions="10* 5 20*" Background="White">
+
+    <Grid ColumnDefinitions="* 100" Background="White">
+      <ListBox Grid.Column="0" Margin="4" Items="{Binding DirectoryData}" SelectedItem="{Binding FolderListBoxItem, Mode=TwoWay}"></ListBox>
+      <StackPanel Grid.Column="1">
+        <Button Margin="4" Width="90" Command="{Binding OnAddButton}">Добавить</Button>
+        <Button Margin="4" Width="90" Command="{Binding OnDeleteButton}">Удалить</Button>
+      </StackPanel>
+    </Grid>
+
+    <GridSplitter Grid.Row="1" Background="Gray" ></GridSplitter>
+
+
+    <DockPanel Grid.Row="2" Background="White">
+      <StackPanel DockPanel.Dock="Top" Orientation="Horizontal">
+        <TextBlock Margin="4" VerticalAlignment="Center">Фильтр:</TextBlock>
+        <RadioButton Margin="4" Padding="5" IsChecked="True">Все</RadioButton>
+        <RadioButton Margin="4" Padding="5">Добавленные</RadioButton>
+        <RadioButton Margin="4" Padding="5">Удаленные</RadioButton>
+        <RadioButton Margin="4" Padding="5">Измененные</RadioButton>
+      </StackPanel>
+      <Grid ColumnDefinitions="* 100">
+        <DataGrid Grid.Column="0" Name="fileDataGrid" 
+                  VerticalScrollBarVisibility="Visible"
+                  CanUserReorderColumns="True"
+                  CanUserResizeColumns="True"
+                  CanUserSortColumns="True"
+                  GridLinesVisibility="All"
+                  Items="{Binding FileData}">
+              
+                <DataGrid.Columns>
+                  <!--<DataGridTextColumn Header="Имя" Binding="{Binding Name}"/>-->
+                  <DataGridTemplateColumn Header="Имя">
+                    <DataGridTemplateColumn.CellTemplate>
+                      <DataTemplate>
+                        <StackPanel Orientation="Horizontal" 
+                                    Spacing="5"
+                                    VerticalAlignment="Center">
+                          <Image Source="{Binding FileState, Converter={StaticResource fileStateConverterToImage}}" VerticalAlignment="Center"/>
+                          <TextBlock Text="{Binding Name}" VerticalAlignment="Center" FontWeight="{Binding IsDirectory, Converter={StaticResource isDirectoryToFont}}" />
+                        </StackPanel>
+                      </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                  </DataGridTemplateColumn>
+                  <DataGridTextColumn Header="Состояние" Binding="{Binding FileState, Converter={StaticResource fileStateConverterToString}}"/>
+                  <DataGridTextColumn Header="Версия" Binding="{Binding Version}"/>
+                  <DataGridTextColumn Header="Время"  Binding="{Binding Time}"/>
+                  <DataGridTextColumn Header="Размер" Binding="{Binding Size}"/>
+                  <DataGridTextColumn Header="Хэш" Binding="{Binding Hash}"/>
+                </DataGrid.Columns>
+              </DataGrid>
+            
+        <StackPanel Grid.Column="1">
+          <Button Margin="4" Width="90" Command="{Binding OnCheckButton}">Сравнить</Button>
+          <Button Margin="4" Width="90" Command="{Binding OnUpdateButton}">Обновить</Button>
+        </StackPanel>
+      </Grid>
+    </DockPanel>
+  </Grid>
+</DockPanel>
+</UserControl>
