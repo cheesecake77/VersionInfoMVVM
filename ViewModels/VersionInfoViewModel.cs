@@ -80,7 +80,7 @@ namespace VersionInfoMVVM.ViewModels
                 var res = d.ShowAsync(App.MainWindow).Result;
                 if (res != null)
                 {
-                    currentFile = res[0];
+                    CurrentFile = res[0];
                     var serializer = new XmlSerializer(typeof(DataUnit));
                     using var reader = new StreamReader(res[0]);
                     var input = (DataUnit?)serializer.Deserialize(reader);
@@ -100,18 +100,18 @@ namespace VersionInfoMVVM.ViewModels
                 {
                     FileData.Clear();
                     DirectoryData.Clear();
-                    if (currentFile != null) currentFile = null;
+                    if (CurrentFile != null) CurrentFile = null;
                     data.directoryData = DirectoryData;
                     data.fileData = FileData;
                 }
             });
             OnSaveItem = ReactiveCommand.Create(() =>
             {
-                if (currentFile != null)
+                if (CurrentFile != null)
                 {
                     var serializer = new XmlSerializer(typeof(DataUnit));
                     DataUnit output = new() { fileData = FileData, directoryData = DirectoryData };
-                    using var writer = new StreamWriter(currentFile);
+                    using var writer = new StreamWriter(CurrentFile);
                     serializer.Serialize(writer, output);
                 }
             });
@@ -264,76 +264,66 @@ namespace VersionInfoMVVM.ViewModels
         }
     }
     // AFTERWARDS: объединить конвертеры FileState в один конвертер
-    public class FileStateConverterToString : IValueConverter
+    public class FileStateConverter : IValueConverter
     {
-        public static readonly FileStateConverterToString Instance = new();
+        public static readonly FileStateConverter Instance = new();
 
-        public object? Convert(object? value, Type target, object? parameter, CultureInfo culture)
+        public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         {
-            if (value is FileState fileState) 
+            if (value is FileState fileState)
             {
-                switch (fileState)
+                if (targetType.IsAssignableTo(typeof(string)))
+                    switch (fileState)
+                    {
+                        case FileState.Ok:
+                            return "Ок";
+
+                        case FileState.Unknown:
+                            return "Неизвестно";
+
+                        case FileState.Deleted:
+                            return "Удален";
+
+                        case FileState.Modified:
+                            return "Изменен";
+
+                        case FileState.Added:
+                            return "Добавлен";
+
+                        default:
+                            throw new ArgumentOutOfRangeException("Неккоректный FileState", nameof(fileState));
+                    }
+
+                if (targetType.IsAssignableTo(typeof(IImage)))
                 {
-                    case FileState.Ok: 
-                        return "Ок";
+                    var assets = AvaloniaLocator.Current.GetService<IAssetLoader>();
+                    string assemblyName = Assembly.GetEntryAssembly().GetName().Name;
+                    switch (fileState)
+                    {
+                        case FileState.Ok:
+                            return new Bitmap(assets.Open(new Uri($"avares://{assemblyName}/Assets/ok.png")));
 
-                    case FileState.Unknown:
-                        return "Неизвестно";
+                        case FileState.Unknown:
+                            return new Bitmap(assets.Open(new Uri($"avares://{assemblyName}/Assets/unknown.png")));
 
-                    case FileState.Deleted:
-                        return "Удален";
+                        case FileState.Deleted:
+                            return new Bitmap(assets.Open(new Uri($"avares://{assemblyName}/Assets/deleted.png")));
 
-                    case FileState.Modified:
-                        return "Изменен";
+                        case FileState.Modified:
+                            return new Bitmap(assets.Open(new Uri($"avares://{assemblyName}/Assets/modified.png")));
 
-                    case FileState.Added:
-                        return "Добавлен";
+                        case FileState.Added:
+                            return new Bitmap(assets.Open(new Uri($"avares://{assemblyName}/Assets/added.png")));
 
-                    default:
-                        throw new ArgumentOutOfRangeException("Неккоректный FileState",nameof(fileState));
-                } 
+                        default:
+                            return new Bitmap(assets.Open(new Uri($"avares://{assemblyName}/Assets/exception.png")));
+                    }
+                }
             }
-
             return value;
         }
 
         public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
-        {
-            return value;
-        }
-    }
-    public class FileStateConverterToImage : IValueConverter
-    {
-        public static readonly FileStateConverterToImage Instance = new();
-        object? IValueConverter.Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
-        {
-            var assets = AvaloniaLocator.Current.GetService<IAssetLoader>();
-            string assemblyName = Assembly.GetEntryAssembly().GetName().Name;
-            if (value is FileState fileState)
-            switch (fileState)
-                {
-                    case FileState.Ok:
-                        return new Bitmap(assets.Open(new Uri($"avares://{assemblyName}/Assets/ok.png")));
-
-                    case FileState.Unknown:
-                        return new Bitmap(assets.Open(new Uri($"avares://{assemblyName}/Assets/unknown.png")));
-
-                    case FileState.Deleted:
-                        return new Bitmap(assets.Open(new Uri($"avares://{assemblyName}/Assets/deleted.png")));
-
-                    case FileState.Modified:
-                        return new Bitmap(assets.Open(new Uri($"avares://{assemblyName}/Assets/modified.png")));
-
-                    case FileState.Added:
-                        return new Bitmap(assets.Open(new Uri($"avares://{assemblyName}/Assets/added.png")));
-
-                    default:
-                        return new Bitmap(assets.Open(new Uri($"avares://{assemblyName}/Assets/exception.png")));
-                }
-            return value;
-        }
-
-        object? IValueConverter.ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
         {
             return value;
         }

@@ -7,16 +7,15 @@
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
              x:Class="VersionInfoMVVM.Views.VersionInfoView">
   <UserControl.Resources>
-    <local:FileStateConverterToString x:Key="fileStateConverterToString"/>
-    <local:FileStateConverterToImage x:Key="fileStateConverterToImage"/>
+    <local:FileStateConverter x:Key="fileStateConverter"/>
     <local:IsDirectoryFontConverter x:Key="isDirectoryToFont"/>
   </UserControl.Resources>
   <DockPanel >
   <Menu DockPanel.Dock="Top" Height="20">
     <MenuItem Header="Файл">
-      <MenuItem IsEnabled="True" Header="Открыть" Command="{Binding OnOpenItem}"/>
+      <MenuItem Header="Открыть" Command="{Binding OnOpenItem}"/>
       <MenuItem Header="Создать" Command="{Binding OnCreateItem}"/>
-      <MenuItem Header="Сохранить" Command="{Binding OnSaveItem}"/>
+      <MenuItem Header="Сохранить" Command="{Binding OnSaveItem}" IsEnabled="{Binding !!CurrentFile}"/>
       <MenuItem Header="Сохранить как" Command="{Binding OnSaveAsItem}"/>
       <MenuItem Header="Экспортировать">
         <MenuItem Header="Экспортировать в .txt"></MenuItem>
@@ -68,13 +67,13 @@
                         <StackPanel Orientation="Horizontal" 
                                     Spacing="5"
                                     VerticalAlignment="Center">
-                          <Image Source="{Binding FileState, Converter={StaticResource fileStateConverterToImage}}" VerticalAlignment="Center"/>
+                          <Image Source="{Binding FileState, Converter={StaticResource fileStateConverter}}" VerticalAlignment="Center"/>
                           <TextBlock Text="{Binding Name}" VerticalAlignment="Center" FontWeight="{Binding IsDirectory, Converter={StaticResource isDirectoryToFont}}" />
                         </StackPanel>
                       </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                   </DataGridTemplateColumn>
-                  <DataGridTextColumn Header="Состояние" Binding="{Binding FileState, Converter={StaticResource fileStateConverterToString}}"/>
+                  <DataGridTextColumn Header="Состояние" Binding="{Binding FileState, Converter={StaticResource fileStateConverter}}"/>
                   <DataGridTextColumn Header="Версия" Binding="{Binding Version}"/>
                   <DataGridTextColumn Header="Время"  Binding="{Binding Time}"/>
                   <DataGridTextColumn Header="Размер" Binding="{Binding Size}"/>
@@ -83,7 +82,7 @@
               </DataGrid>
             
         <StackPanel Grid.Column="1">
-          <Button Margin="4" Width="90" Command="{Binding OnCheckButton}">Сравнить</Button>
+          <Button Margin="4" Width="90" Command="{Binding OnCheckButton}" IsEnabled="{Binding !!CurrentFile}">Сравнить</Button>
           <Button Margin="4" Width="90" Command="{Binding OnUpdateButton}">Обновить</Button>
         </StackPanel>
       </Grid>
