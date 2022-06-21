@@ -45,10 +45,10 @@
     <DockPanel Grid.Row="2" Background="White">
       <StackPanel DockPanel.Dock="Top" Orientation="Horizontal">
         <TextBlock Margin="4" VerticalAlignment="Center">Фильтр:</TextBlock>
-        <RadioButton Margin="4" Padding="5" IsChecked="True">Все</RadioButton>
-        <RadioButton Margin="4" Padding="5">Добавленные</RadioButton>
-        <RadioButton Margin="4" Padding="5">Удаленные</RadioButton>
-        <RadioButton Margin="4" Padding="5">Измененные</RadioButton>
+        <RadioButton Margin="4" Padding="5" IsChecked="True" GroupName="Filter" Command="{Binding OnAllRadioButton}">Все</RadioButton>
+        <RadioButton Margin="4" Padding="5" GroupName="Filter">Добавленные</RadioButton>
+        <RadioButton Margin="4" Padding="5" GroupName="Filter">Удаленные</RadioButton>
+        <RadioButton Margin="4" Padding="5" GroupName="Filter">Измененные</RadioButton>
       </StackPanel>
       <Grid ColumnDefinitions="* 100">
         <DataGrid Grid.Column="0" Name="fileDataGrid" 
