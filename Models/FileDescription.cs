@@ -67,8 +67,6 @@ namespace VersionInfoMVVM.Models
 
         public bool Equals(FileDescription? other)
         {
-            var x = this.Time.ToString("G");
-            // TODO: исправить проверку времени
             if (other == null) return false;
             if (this.Size != other.Size) return false;
             if (this.Time.ToString("G") != other.Time.ToString("G")) return false;
