@@ -30,7 +30,7 @@ namespace VersionInfoMVVM.ViewModels
     // TODO: добавить состояния приложения (Ready, Updating и т. п.)
     // TODO: запись в txt, cvs, docx, xlsx
     // TODO: обработать отключение и включение интерфейса в зависимости от полей (currentFile is null, кнопка Save отключена и т.д.) 
-    // TODO: сделать фильтрацию файлов с помощью radioButton'ов
+    // AFTERWARDS: поправить поведение RadioButton'ов (например выключать после нажатия)
     public class VersionInfoViewModel : ViewModelBase
     {
         private string? currentFile;
@@ -59,7 +59,8 @@ namespace VersionInfoMVVM.ViewModels
 
         public VersionInfoViewModel(DataUnit data)
         {
-
+            FileData = new ObservableCollection<BaseDescription>();
+            DirectoryData = new ObservableCollection<string>();
             StatusBarText = "Готово";
             AppMode = AppMode.Ready;
             if (data.fileData != null && data.directoryData != null)
@@ -67,12 +68,9 @@ namespace VersionInfoMVVM.ViewModels
                 FileData = data.fileData;
                 DirectoryData = data.directoryData;
             }
-            else
-            {
-                FileData = new ObservableCollection<BaseDescription>();
-                DirectoryData = new ObservableCollection<string>();
-            }
-            //Определение обработчкиов меню
+            else data = new DataUnit();
+
+                //Определение обработчкиов меню
             OnOpenItem = ReactiveCommand.Create(() =>
             {
                 var d = new OpenFileDialog { Title = "Открыть файл..." };
@@ -88,8 +86,8 @@ namespace VersionInfoMVVM.ViewModels
                     {
                         DirectoryData = input.directoryData;
                         FileData = input.fileData;
-                        data.fileData = FileData;
-                        data.directoryData = directoryData;
+                        data.fileData = input.fileData;
+                        data.directoryData = input.directoryData; ;
                     }
 
                 }
@@ -140,11 +138,16 @@ namespace VersionInfoMVVM.ViewModels
                 var res = await d.ShowAsync(App.MainWindow);
                 if (string.IsNullOrEmpty(res) || DirectoryData.Contains(res)) return;
                 DirectoryData.Add(res);
+                data.directoryData.Add(res);
             });
             OnDeleteButton = ReactiveCommand.Create(() =>
             {
                 if (FolderListBoxItem == null) return;
-                if (FolderListBoxItem is String folder) DirectoryData.Remove(folder);
+                if (FolderListBoxItem is String folder)
+                {
+                    DirectoryData.Remove(folder);
+                    data.directoryData.Remove(folder);
+                }
             });
             OnUpdateButton = ReactiveCommand.Create(() =>
             {
@@ -160,6 +163,7 @@ namespace VersionInfoMVVM.ViewModels
                         }
                 }).ContinueWith(t => {
                     FileData = flist;
+                    data.fileData = flist;
                     StatusBarText = "Готово";
                 });
 
@@ -223,6 +227,7 @@ namespace VersionInfoMVVM.ViewModels
                     }
 
                     FileData = temp_list;
+                    data.fileData = temp_list;
 
                 }).ContinueWith(t =>
                 {
@@ -230,7 +235,57 @@ namespace VersionInfoMVVM.ViewModels
                 });
 
             });
-            
+
+            //Определение обработчиков RadioButton'ов
+            OnAllRadioButton = ReactiveCommand.Create(() => {
+                if (data.fileData != null) FileData = data.fileData;
+            });
+
+            OnAddedRadioButton = ReactiveCommand.Create(() => {
+                if (data.fileData != null)
+                {
+                    FileData = new ObservableCollection<BaseDescription>();
+                    foreach (var file in data.fileData)
+                    {
+                        if (file is DirectoryDescription baseD) FileData.Add(baseD);
+                        if (file is FileDescription fileD)
+                        {
+                            if (fileD.FileState == FileState.Added) FileData.Add(fileD);
+                        }
+                    }
+                }
+            });
+
+            OnDeletedRadioButton = ReactiveCommand.Create(() => {
+                if (data.fileData != null)
+                {
+                    FileData = new ObservableCollection<BaseDescription>();
+                    foreach (var file in data.fileData)
+                    {
+                        if (file is DirectoryDescription baseD) FileData.Add(baseD);
+                        if (file is FileDescription fileD)
+                        {
+                            if (fileD.FileState == FileState.Deleted) FileData.Add(fileD);
+                        }
+                    }
+                }
+            });
+
+            OnModifiedRadioButton = ReactiveCommand.Create(() => {
+                if (data.fileData != null)
+                {
+                    FileData = new ObservableCollection<BaseDescription>();
+                    foreach (var file in data.fileData)
+                    {
+                        if (file is DirectoryDescription baseD) FileData.Add(baseD);
+                        if (file is FileDescription fileD)
+                        {
+                            if (fileD.FileState == FileState.Modified) FileData.Add(fileD);
+                        }
+                    }
+                }
+            });
+
         }
         //Объвление обработчиков меню
         public ReactiveCommand<Unit, Unit> OnOpenItem { get; }
@@ -244,7 +299,12 @@ namespace VersionInfoMVVM.ViewModels
         public ReactiveCommand<Unit, Unit> OnDeleteButton { get; }
         public ReactiveCommand<Unit, Unit> OnCheckButton { get; }
         public ReactiveCommand<Unit, Unit> OnUpdateButton { get; }
-        
+
+        //Объявление обработчиков RadioButton'ов
+        public ReactiveCommand<Unit, Unit> OnAllRadioButton { get; }
+        public ReactiveCommand<Unit, Unit> OnAddedRadioButton { get; }
+        public ReactiveCommand<Unit, Unit> OnDeletedRadioButton { get; }
+        public ReactiveCommand<Unit, Unit> OnModifiedRadioButton { get; }
 
         //Вспомогательные методы
         private void FindFiles(string directory, ObservableCollection<BaseDescription> files)
@@ -263,7 +323,7 @@ namespace VersionInfoMVVM.ViewModels
                 foreach (var d in dlist) FindFiles(d, files);
         }
     }
-    // AFTERWARDS: объединить конвертеры FileState в один конвертер
+    //Конвертеры
     public class FileStateConverter : IValueConverter
     {
         public static readonly FileStateConverter Instance = new();
@@ -343,6 +403,8 @@ namespace VersionInfoMVVM.ViewModels
             return value;
         }
     }
+
+    //Перечисления
     public enum AppMode
     {
         Ready,
