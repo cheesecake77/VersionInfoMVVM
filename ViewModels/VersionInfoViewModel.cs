@@ -24,16 +24,20 @@ namespace VersionInfoMVVM.ViewModels
 {
     // TODO: всплывающие окна с предложением сохранить после Create, Exit и Open
     // AFTERWARDS: вынести стилизацию в отдельный файл
-    // TODO: прерывание операций Сравнение и Обновление
+    // HIGHPRIORITY: прерывание операций Сравнение и Обновление
     // AFTERWARDS: написать unit test'ы
     // AFTERWARDS: очистка кода
     // TODO: добавить состояния приложения (Ready, Updating и т. п.)
     // TODO: запись в txt, cvs, docx, xlsx
     // TODO: обработать отключение и включение интерфейса в зависимости от полей (currentFile is null, кнопка Save отключена и т.д.) 
     // AFTERWARDS: поправить поведение RadioButton'ов (например выключать после нажатия)
+    // TODO: кнопки сравнить сохранить всегда доступны, удалить недоступна если не выделен item в listbox
+    // TODO: автоматически обновлять список файлов при удалении
+    // TODO: поменять местами создать и обновить
     public class VersionInfoViewModel : ViewModelBase
     {
         private string? currentFile;
+        bool stopRunning = false, running = false;
         public string CurrentFile
         {
             get => currentFile; set
@@ -138,7 +142,7 @@ namespace VersionInfoMVVM.ViewModels
                 var res = await d.ShowAsync(App.MainWindow);
                 if (string.IsNullOrEmpty(res) || DirectoryData.Contains(res)) return;
                 DirectoryData.Add(res);
-                data.directoryData.Add(res);
+                //data.directoryData.Add(res);
             });
             OnDeleteButton = ReactiveCommand.Create(() =>
             {
@@ -146,25 +150,42 @@ namespace VersionInfoMVVM.ViewModels
                 if (FolderListBoxItem is String folder)
                 {
                     DirectoryData.Remove(folder);
-                    data.directoryData.Remove(folder);
+                    //data.directoryData.Remove(folder);
                 }
             });
             OnUpdateButton = ReactiveCommand.Create(() =>
             {
+                if (running) 
+                { 
+                    stopRunning = true;
+                    statusBarText = "Готово";
+                    running = false;
+                    return; 
+                }
+              
                 if (FileData != null) FileData.Clear();
                 var flist = new ObservableCollection<BaseDescription>();
+                stopRunning = false;
+                running = true;
                 Task.Run(() =>
                 {
                     if (DirectoryData != null)
                         foreach (var d in DirectoryData)
                         {
+                            if (stopRunning) throw new Exception();
+                                ;
                             Dispatcher.UIThread.InvokeAsync(() => StatusBarText = $"Загрузка файлов из директории {d}");
                             FindFiles(d, flist);
                         }
                 }).ContinueWith(t => {
+                    StatusBarText = "Готово";
+                    if (t.IsFaulted)
+                    {
+                        StatusBarText = "Canceled";
+                    }
                     FileData = flist;
                     data.fileData = flist;
-                    StatusBarText = "Готово";
+                    
                 });
 
             });
@@ -314,19 +335,26 @@ namespace VersionInfoMVVM.ViewModels
             var flist = Directory.GetFiles(directory);
             foreach (string f in flist)
             {
+                if (stopRunning) throw new Exception();
+                    ;
                 var file = new FileDescription() { Path = f };
                 files.Add(file.FillProperties());
 
             }
             var dlist = Directory.GetDirectories(directory);
             if (dlist != null)
-                foreach (var d in dlist) FindFiles(d, files);
+                foreach (var d in dlist)
+                {
+                    if (stopRunning) throw new Exception();
+                        ;
+                    FindFiles(d, files);
+                }
         }
     }
     //Конвертеры
     public class FileStateConverter : IValueConverter
     {
-        public static readonly FileStateConverter Instance = new();
+        //public static readonly FileStateConverter Instance = new();
 
         public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         {
