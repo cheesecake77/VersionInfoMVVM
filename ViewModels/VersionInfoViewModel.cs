@@ -27,7 +27,6 @@ namespace VersionInfoMVVM.ViewModels
     // AFTERWARDS: написать unit test'ы
     // AFTERWARDS: очистка кода
     // TODO: запись в txt, cvs, docx, xlsx
-    // AFTERWARDS: поправить поведение RadioButton'ов (например выключать после нажатия)
     // HIGHPRIORITY: разобраться с warning'ами
     // HIGHPRIORITY: полностью отладить работу программы, починить работу с данными
     // HIGHPRIORITY: переделать radioButton'ы
@@ -38,7 +37,7 @@ namespace VersionInfoMVVM.ViewModels
 
         //Свойства для работы с данными
         string? currentFile;
-        public string CurrentFile { get => currentFile; set => this.RaiseAndSetIfChanged(ref currentFile, value); }
+        public string? CurrentFile { get => currentFile; set => this.RaiseAndSetIfChanged(ref currentFile, value); }
 
         ObservableCollection<BaseDescription>? fileData;
         public ObservableCollection<BaseDescription>? FileData { get => fileData; set => this.RaiseAndSetIfChanged(ref fileData, value); }
@@ -47,7 +46,7 @@ namespace VersionInfoMVVM.ViewModels
 
         //Свойства для работы с интерфейсом
         string? selectedItem;
-        public string FolderListBoxItem { get => selectedItem; set => this.RaiseAndSetIfChanged(ref selectedItem, value); }
+        public string? FolderListBoxItem { get => selectedItem; set => this.RaiseAndSetIfChanged(ref selectedItem, value); }
 
         string? statusBarText;
         public string? StatusBarText { get => statusBarText; set => this.RaiseAndSetIfChanged(ref statusBarText, value); }
@@ -103,14 +102,28 @@ namespace VersionInfoMVVM.ViewModels
                     if (CurrentFile != null) CurrentFile = null;
                 }
             });
-            OnSaveItem = ReactiveCommand.Create(() =>
+            OnSaveItem = ReactiveCommand.Create(async() =>
             {
-                if (CurrentFile != null)
+                if (CurrentFile is String currentfile)
                 {
                     var serializer = new XmlSerializer(typeof(DataUnit));
                     DataUnit output = new() { fileData = FileData, directoryData = DirectoryData };
                     using var writer = new StreamWriter(CurrentFile);
                     serializer.Serialize(writer, output);
+                }
+
+                if (CurrentFile is null)
+                {
+                    var d = new SaveFileDialog();
+                    d.Filters.Add(new FileDialogFilter() { Name = "XML-документ", Extensions = { "xml" } });
+                    var res = await d.ShowAsync(App.MainWindow);
+                    if (res != null)
+                    {
+                        var serializer = new XmlSerializer(typeof(DataUnit));
+                        DataUnit output = new() { fileData = FileData, directoryData = DirectoryData };
+                        using var writer = new StreamWriter(res);
+                        serializer.Serialize(writer, output);
+                    }
                 }
             });
             OnSaveAsItem = ReactiveCommand.Create(async () =>
@@ -280,7 +293,7 @@ namespace VersionInfoMVVM.ViewModels
         //Объвление обработчиков меню
         public ReactiveCommand<Unit, Unit> OnOpenItem { get; }
         public ReactiveCommand<Unit, Unit> OnCreateItem { get; }
-        public ReactiveCommand<Unit, Unit> OnSaveItem { get; }
+        public ReactiveCommand<Unit, Task> OnSaveItem { get; }
         public ReactiveCommand<Unit, Task> OnSaveAsItem { get; }
         public ReactiveCommand<Unit, Unit> OnCloseItem { get; }
 

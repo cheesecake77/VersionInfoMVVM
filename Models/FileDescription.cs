@@ -16,6 +16,7 @@ namespace VersionInfoMVVM.Models
     {
         public FileDescription FillProperties()
         {
+            if (Path is string path)
             try
             {
                 var fileInfo = new FileInfo(Path);
@@ -40,8 +41,8 @@ namespace VersionInfoMVVM.Models
         public long Size { get; set; }
         public DateTime Time { get; set; }
 
-        public string Version { get; set; }
-        public string Hash { get; set; }
+        public string? Version { get; set; }
+        public string? Hash { get; set; }
 
         public FileState FileState { get; set; }
 

@@ -9,7 +9,7 @@ namespace VersionInfoMVVM.Models
     [Serializable]
     public class BaseDescription
     {
-        public string? Path { get; set; }
+        public string Path { get; set; }
         public bool IsDirectory { get; set; }
 
         virtual public string Name => System.IO.Path.GetFileName(Path);

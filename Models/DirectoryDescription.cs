@@ -19,7 +19,9 @@ namespace VersionInfoMVVM.Models
         }
         public override string ToString()
         {
+            if (Path is not null)
             return Path;
+            return Name;
         }
     }
 }
