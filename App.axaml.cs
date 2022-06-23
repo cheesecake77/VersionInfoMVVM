@@ -20,12 +20,12 @@ namespace VersionInfoMVVM
         {
             if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
             {
-                var d = new DataUnit();
+                var dataUnit = new DataUnit();
                 desktop.MainWindow = new MainWindow
                 {
-                    DataContext = new MainWindowViewModel(d),
+                    DataContext = new MainWindowViewModel(dataUnit),
                 };
-                App.MainWindow = desktop.MainWindow as MainWindow; //HACK: сохранение окна
+                MainWindow = (MainWindow)desktop.MainWindow; //HACK: сохранение окна
             }
 
             base.OnFrameworkInitializationCompleted();

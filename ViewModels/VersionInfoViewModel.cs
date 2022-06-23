@@ -23,13 +23,11 @@ using System.Reflection;
 namespace VersionInfoMVVM.ViewModels 
 {
     // AFTERWARDS: всплывающие окна с предложением сохранить после Create, Exit и Open
-    // AFTERWARDS: вынести стилизацию в отдельный файл
     // AFTERWARDS: написать unit test'ы
-    // AFTERWARDS: очистка кода
+    // AFTERWARDS: рефакторинг
     // TODO: запись в txt, cvs, docx, xlsx
-    // HIGHPRIORITY: разобраться с warning'ами
     // HIGHPRIORITY: полностью отладить работу программы, починить работу с данными
-    // HIGHPRIORITY: переделать radioButton'ы
+    // HIGHPRIORITY: переделать radioButton'ы (после Check)
     public class VersionInfoViewModel : ViewModelBase
     {
         //Флаги
@@ -154,15 +152,12 @@ namespace VersionInfoMVVM.ViewModels
             });
             OnDeleteButton = ReactiveCommand.Create(() =>
             {
-                // TODO: отдебажить
                 if (FolderListBoxItem is not String folder)
                 {
                     return;
                 }
                 DirectoryData.Remove(folder);
                 foreach (var file in FileData.Where(f => f.Path.StartsWith(folder)).ToList()) FileData.Remove(file);
-                var dirCheck = new ObservableCollection<string>(DirectoryData);
-                var fileCheck = new ObservableCollection<BaseDescription>(FileData);
             });
             OnUpdateButton = ReactiveCommand.Create(() =>
             {
@@ -213,14 +208,14 @@ namespace VersionInfoMVVM.ViewModels
                 CheckButtonText = "Отмена";
 
                 //Сохранение текущего состояния
-                var savedFileList = new ObservableCollection<BaseDescription>(FileData);
+                var oldFileList = new ObservableCollection<BaseDescription>(FileData);
 
                 //Обновляем данные
                 if (FileData != null) FileData.Clear();
                 var flist = new ObservableCollection<BaseDescription>();
                 stopRunning = false;
                 running = true;
-                Task.Run(() =>
+                _ = Task.Run(() =>
                 {
                     if (DirectoryData != null)
                         foreach (var d in DirectoryData)
@@ -228,7 +223,8 @@ namespace VersionInfoMVVM.ViewModels
                             if (stopRunning) throw new Exception();
                             FindFiles(d, flist);
                         }
-                }).ContinueWith(t => {
+                }).ContinueWith(t =>
+                {
                     StatusBarText = "Готово";
                     CheckButtonText = "Сравнить";
                     if (t.IsFaulted)
@@ -236,20 +232,21 @@ namespace VersionInfoMVVM.ViewModels
                         StatusBarText = "Canceled";
                         stopRunning = false;
                     }
-                #endregion
+                    #endregion
                     // FIX: починить работу Check
                     FileData = flist;
 
                     var newFileList = new ObservableCollection<BaseDescription>(FileData);
 
                     //Сравниваем старые и новые данные, изменеяем НОВЫЕ данные 
+                    #region FixThis
                     foreach (var file in newFileList.OfType<FileDescription>())
                     {
-                        var found = (FileDescription?)savedFileList.FirstOrDefault(f => f.Path == file.Path);
+                        var found = (FileDescription?)oldFileList.FirstOrDefault(f => f.Path == file.Path);
                         if (found == null) file.FileState = FileState.Added;
                     }
 
-                    foreach (var file in savedFileList)
+                    foreach (var file in oldFileList)
                     {
                         if (file is DirectoryDescription dir)
                         {
@@ -269,9 +266,10 @@ namespace VersionInfoMVVM.ViewModels
                     }
                     foreach (var file in newFileList.OfType<FileDescription>())
                     {
-                        var found = savedFileList.FirstOrDefault(f => f.Path == file.Path);
-                        if (found is not null && !file.Equals(found)) file.FileState = FileState.Modified; 
+                        var found = oldFileList.FirstOrDefault(f => f.Path == file.Path);
+                        if (found is not null && !file.Equals(found)) file.FileState = FileState.Modified;
                     }
+                    #endregion
                     FileData = new ObservableCollection<BaseDescription>(newFileList);
                 });
             });
