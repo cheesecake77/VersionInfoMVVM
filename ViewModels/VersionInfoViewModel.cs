@@ -22,59 +22,59 @@ using System.Reflection;
 
 namespace VersionInfoMVVM.ViewModels 
 {
-    // TODO: всплывающие окна с предложением сохранить после Create, Exit и Open
+    // AFTERWARDS: всплывающие окна с предложением сохранить после Create, Exit и Open
     // AFTERWARDS: вынести стилизацию в отдельный файл
-    // HIGHPRIORITY: прерывание операций Сравнение и Обновление
     // AFTERWARDS: написать unit test'ы
     // AFTERWARDS: очистка кода
-    // TODO: добавить состояния приложения (Ready, Updating и т. п.)
     // TODO: запись в txt, cvs, docx, xlsx
-    // TODO: обработать отключение и включение интерфейса в зависимости от полей (currentFile is null, кнопка Save отключена и т.д.) 
     // AFTERWARDS: поправить поведение RadioButton'ов (например выключать после нажатия)
-    // TODO: кнопки сравнить сохранить всегда доступны, удалить недоступна если не выделен item в listbox
-    // TODO: автоматически обновлять список файлов при удалении
-    // TODO: поменять местами создать и обновить
+    // HIGHPRIORITY: разобраться с warning'ами
+    // HIGHPRIORITY: полностью отладить работу программы, починить работу с данными
+    // HIGHPRIORITY: переделать radioButton'ы
     public class VersionInfoViewModel : ViewModelBase
     {
-        private string? currentFile;
+        //Флаги
         bool stopRunning = false, running = false;
-        public string CurrentFile
-        {
-            get => currentFile; set
-            {
-                this.RaiseAndSetIfChanged(ref currentFile, value);
-            }
-        }
 
-        private ObservableCollection<BaseDescription>? fileData;
+        //Свойства для работы с данными
+        string? currentFile;
+        public string CurrentFile { get => currentFile; set => this.RaiseAndSetIfChanged(ref currentFile, value); }
+
+        ObservableCollection<BaseDescription>? fileData;
         public ObservableCollection<BaseDescription>? FileData { get => fileData; set => this.RaiseAndSetIfChanged(ref fileData, value); }
-        private ObservableCollection<string>? directoryData;
+        ObservableCollection<string>? directoryData;
         public ObservableCollection<string>? DirectoryData { get => directoryData; set => this.RaiseAndSetIfChanged(ref directoryData, value); }
 
-        private string? selectedItem;
+        //Свойства для работы с интерфейсом
+        string? selectedItem;
         public string FolderListBoxItem { get => selectedItem; set => this.RaiseAndSetIfChanged(ref selectedItem, value); }
 
-        private string? statusBarText;
+        string? statusBarText;
         public string? StatusBarText { get => statusBarText; set => this.RaiseAndSetIfChanged(ref statusBarText, value); }
 
-        private AppMode appMode;
-        public AppMode AppMode { get => appMode; set => this.RaiseAndSetIfChanged(ref appMode, value); }
+        string? updateButtonText;
+        public string? UpdateButtonText { get => updateButtonText; set => this.RaiseAndSetIfChanged(ref updateButtonText, value); }
+
+        string? checkButtonText;
+        public string? CheckButtonText { get => checkButtonText; set => this.RaiseAndSetIfChanged(ref checkButtonText, value); }
 
 
         public VersionInfoViewModel(DataUnit data)
         {
+            //Инициализация
             FileData = new ObservableCollection<BaseDescription>();
             DirectoryData = new ObservableCollection<string>();
             StatusBarText = "Готово";
-            AppMode = AppMode.Ready;
+            UpdateButtonText = "Обновить";
+            CheckButtonText = "Сравнить";
+
             if (data.fileData != null && data.directoryData != null)
             {
                 FileData = data.fileData;
                 DirectoryData = data.directoryData;
             }
-            else data = new DataUnit();
 
-                //Определение обработчкиов меню
+            //Определение обработчкиов меню
             OnOpenItem = ReactiveCommand.Create(() =>
             {
                 var d = new OpenFileDialog { Title = "Открыть файл..." };
@@ -90,8 +90,6 @@ namespace VersionInfoMVVM.ViewModels
                     {
                         DirectoryData = input.directoryData;
                         FileData = input.fileData;
-                        data.fileData = input.fileData;
-                        data.directoryData = input.directoryData; ;
                     }
 
                 }
@@ -103,8 +101,6 @@ namespace VersionInfoMVVM.ViewModels
                     FileData.Clear();
                     DirectoryData.Clear();
                     if (CurrentFile != null) CurrentFile = null;
-                    data.directoryData = DirectoryData;
-                    data.fileData = FileData;
                 }
             });
             OnSaveItem = ReactiveCommand.Create(() =>
@@ -142,27 +138,31 @@ namespace VersionInfoMVVM.ViewModels
                 var res = await d.ShowAsync(App.MainWindow);
                 if (string.IsNullOrEmpty(res) || DirectoryData.Contains(res)) return;
                 DirectoryData.Add(res);
-                //data.directoryData.Add(res);
             });
             OnDeleteButton = ReactiveCommand.Create(() =>
             {
-                if (FolderListBoxItem == null) return;
-                if (FolderListBoxItem is String folder)
+                // TODO: отдебажить
+                if (FolderListBoxItem is not String folder)
                 {
-                    DirectoryData.Remove(folder);
-                    //data.directoryData.Remove(folder);
+                    return;
                 }
+                DirectoryData.Remove(folder);
+                foreach (var file in FileData.Where(f => f.Path.StartsWith(folder)).ToList()) FileData.Remove(file);
+                var dirCheck = new ObservableCollection<string>(DirectoryData);
+                var fileCheck = new ObservableCollection<BaseDescription>(FileData);
             });
             OnUpdateButton = ReactiveCommand.Create(() =>
             {
-                if (running) 
-                { 
+                if (running)
+                {
                     stopRunning = true;
-                    statusBarText = "Готово";
                     running = false;
-                    return; 
+                    statusBarText = "Готово";
+                    UpdateButtonText = "Обновить";
+                    return;
                 }
-              
+                UpdateButtonText = "Отмена";
+
                 if (FileData != null) FileData.Clear();
                 var flist = new ObservableCollection<BaseDescription>();
                 stopRunning = false;
@@ -173,138 +173,107 @@ namespace VersionInfoMVVM.ViewModels
                         foreach (var d in DirectoryData)
                         {
                             if (stopRunning) throw new Exception();
-                                ;
-                            Dispatcher.UIThread.InvokeAsync(() => StatusBarText = $"Загрузка файлов из директории {d}");
                             FindFiles(d, flist);
                         }
                 }).ContinueWith(t => {
                     StatusBarText = "Готово";
+                    UpdateButtonText = "Обновить";
                     if (t.IsFaulted)
                     {
-                        StatusBarText = "Canceled";
+                        StatusBarText = "Update canceled";
+                        stopRunning = false;
                     }
                     FileData = flist;
-                    data.fileData = flist;
-                    
                 });
-
             });
             OnCheckButton = ReactiveCommand.Create(() => 
             {
-                // TODO: проверить check, исправить ветку для измененных файлов, добавить обработку файлов с состоянием Unknown
-                var newList = new ObservableCollection<BaseDescription>();
-                _ = Task.Run(() =>
+                #region Update
+                if (running)
+                {
+                    stopRunning = true;
+                    running = false;
+                    statusBarText = "Готово";
+                    CheckButtonText = "Сравнить";
+                    return;
+                }
+                CheckButtonText = "Отмена";
+
+                //Сохранение текущего состояния
+                var savedFileList = new ObservableCollection<BaseDescription>(FileData);
+
+                //Обновляем данные
+                if (FileData != null) FileData.Clear();
+                var flist = new ObservableCollection<BaseDescription>();
+                stopRunning = false;
+                running = true;
+                Task.Run(() =>
                 {
                     if (DirectoryData != null)
                         foreach (var d in DirectoryData)
                         {
-                            Dispatcher.UIThread.InvokeAsync(() => StatusBarText = $"Загрузка файлов из директории {d}");
-                            FindFiles(d, newList);
+                            if (stopRunning) throw new Exception();
+                            FindFiles(d, flist);
                         }
-
-                    var temp_list = new ObservableCollection<BaseDescription>(FileData);
-                    foreach (FileDescription file in temp_list.Where(f => f is FileDescription))
-                    {
-                        Dispatcher.UIThread.InvokeAsync(() =>
-                        {
-                            var found = newList.FirstOrDefault(t => t.Path == file.Path);
-                            if (found == null)
-                            {
-                                file.FileState = FileState.Deleted;
-                                FileData = temp_list;
-                            }
-                        });
-                    }
-
-                    foreach (FileDescription file in newList.Where(f => f is FileDescription))
-                    {
-                        Dispatcher.UIThread.InvokeAsync(() =>
-                        {
-                            var found = FileData.FirstOrDefault(t => t.Path == file.Path);
-                            if (found == null)
-                            {
-                                file.FileState = FileState.Added;
-                                temp_list.Add(file);
-                            }
-                        });
-                    }
-
-                    foreach (FileDescription file in newList.Where(f => f is FileDescription))
-                    {
-                        var found = (FileDescription)temp_list.FirstOrDefault(t => t.Path == file.Path);
-                        if (found != null)
-                        {
-                            var debug = found.Equals(file);
-                            if (!found.Equals(file)) 
-                            {
-                                found.Time = file.Time;
-                                found.Size = file.Size;
-                                found.Hash = file.Hash;
-                                found.Version = file.Version;
-                                found.FileState = FileState.Modified;
-
-                            }
-                        }
-                    }
-
-                    FileData = temp_list;
-                    data.fileData = temp_list;
-
-                }).ContinueWith(t =>
-                {
+                }).ContinueWith(t => {
                     StatusBarText = "Готово";
-                });
+                    CheckButtonText = "Сравнить";
+                    if (t.IsFaulted)
+                    {
+                        StatusBarText = "Canceled";
+                        stopRunning = false;
+                    }
+                #endregion
+                    // FIX: починить работу Check
+                    FileData = flist;
 
+                    var newFileList = new ObservableCollection<BaseDescription>(FileData);
+
+                    //Сравниваем старые и новые данные, изменеяем НОВЫЕ данные 
+                    foreach (var file in newFileList.OfType<FileDescription>())
+                    {
+                        var found = (FileDescription?)savedFileList.FirstOrDefault(f => f.Path == file.Path);
+                        if (found == null) file.FileState = FileState.Added;
+                    }
+
+                    foreach (var file in savedFileList)
+                    {
+                        if (file is DirectoryDescription dir)
+                        {
+                            var found = newFileList.FirstOrDefault(f => f.Path == dir.Path);
+                            if (found is null) newFileList.Add(dir);
+                        }
+
+                        if (file is FileDescription fl)
+                        {
+                            var found = newFileList.FirstOrDefault(f => f.Path == fl.Path);
+                            if (found is null)
+                            {
+                                fl.FileState = FileState.Deleted;
+                                newFileList.Add(fl);
+                            }
+                        }
+                    }
+                    foreach (var file in newFileList.OfType<FileDescription>())
+                    {
+                        var found = savedFileList.FirstOrDefault(f => f.Path == file.Path);
+                        if (found is not null && !file.Equals(found)) file.FileState = FileState.Modified; 
+                    }
+                    FileData = new ObservableCollection<BaseDescription>(newFileList);
+                });
             });
 
             //Определение обработчиков RadioButton'ов
             OnAllRadioButton = ReactiveCommand.Create(() => {
-                if (data.fileData != null) FileData = data.fileData;
             });
-
             OnAddedRadioButton = ReactiveCommand.Create(() => {
-                if (data.fileData != null)
-                {
-                    FileData = new ObservableCollection<BaseDescription>();
-                    foreach (var file in data.fileData)
-                    {
-                        if (file is DirectoryDescription baseD) FileData.Add(baseD);
-                        if (file is FileDescription fileD)
-                        {
-                            if (fileD.FileState == FileState.Added) FileData.Add(fileD);
-                        }
-                    }
-                }
+                
             });
-
             OnDeletedRadioButton = ReactiveCommand.Create(() => {
-                if (data.fileData != null)
-                {
-                    FileData = new ObservableCollection<BaseDescription>();
-                    foreach (var file in data.fileData)
-                    {
-                        if (file is DirectoryDescription baseD) FileData.Add(baseD);
-                        if (file is FileDescription fileD)
-                        {
-                            if (fileD.FileState == FileState.Deleted) FileData.Add(fileD);
-                        }
-                    }
-                }
-            });
 
+            });
             OnModifiedRadioButton = ReactiveCommand.Create(() => {
-                if (data.fileData != null)
-                {
-                    FileData = new ObservableCollection<BaseDescription>();
-                    foreach (var file in data.fileData)
-                    {
-                        if (file is DirectoryDescription baseD) FileData.Add(baseD);
-                        if (file is FileDescription fileD)
-                        {
-                            if (fileD.FileState == FileState.Modified) FileData.Add(fileD);
-                        }
-                    }
-                }
+                
             });
 
         }
@@ -330,32 +299,32 @@ namespace VersionInfoMVVM.ViewModels
         //Вспомогательные методы
         private void FindFiles(string directory, ObservableCollection<BaseDescription> files)
         {
-
-            files.Add(new DirectoryDescription() { Path = directory });
+            StatusBarText = $"Загрузка файлов из директории {directory}";
             var flist = Directory.GetFiles(directory);
-            foreach (string f in flist)
+            if (flist.Count() > 0)
             {
-                if (stopRunning) throw new Exception();
-                    ;
-                var file = new FileDescription() { Path = f };
-                files.Add(file.FillProperties());
+                files.Add(new DirectoryDescription() { Path = directory });
+                foreach (string f in flist)
+                {
+                    if (stopRunning) throw new Exception();
+                    var file = new FileDescription() { Path = f };
+                    files.Add(file.FillProperties());
 
+                }
             }
             var dlist = Directory.GetDirectories(directory);
             if (dlist != null)
                 foreach (var d in dlist)
                 {
                     if (stopRunning) throw new Exception();
-                        ;
                     FindFiles(d, files);
                 }
         }
     }
+
     //Конвертеры
     public class FileStateConverter : IValueConverter
     {
-        //public static readonly FileStateConverter Instance = new();
-
         public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         {
             if (value is FileState fileState)
@@ -365,9 +334,6 @@ namespace VersionInfoMVVM.ViewModels
                     {
                         case FileState.Ok:
                             return "Ок";
-
-                        case FileState.Unknown:
-                            return "Неизвестно";
 
                         case FileState.Deleted:
                             return "Удален";
@@ -385,14 +351,13 @@ namespace VersionInfoMVVM.ViewModels
                 if (targetType.IsAssignableTo(typeof(IImage)))
                 {
                     var assets = AvaloniaLocator.Current.GetService<IAssetLoader>();
-                    string assemblyName = Assembly.GetEntryAssembly().GetName().Name;
-                    switch (fileState)
+                    string? assemblyName = Assembly.GetEntryAssembly().GetName().Name;
+                    if (assemblyName is null) throw new Exception("Ошибка при определении имени сборки");
+                    if (assets is null) throw new Exception("Не найдены assets");
+                    switch (fileState) 
                     {
                         case FileState.Ok:
                             return new Bitmap(assets.Open(new Uri($"avares://{assemblyName}/Assets/ok.png")));
-
-                        case FileState.Unknown:
-                            return new Bitmap(assets.Open(new Uri($"avares://{assemblyName}/Assets/unknown.png")));
 
                         case FileState.Deleted:
                             return new Bitmap(assets.Open(new Uri($"avares://{assemblyName}/Assets/deleted.png")));
@@ -408,7 +373,7 @@ namespace VersionInfoMVVM.ViewModels
                     }
                 }
             }
-            return value;
+            throw new ArgumentException("Передан аргумент не являщийся FileState", nameof(fileState));
         }
 
         public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
@@ -422,21 +387,18 @@ namespace VersionInfoMVVM.ViewModels
         public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
         {
             if (value is bool isDirectory)
+            {
                 if (isDirectory) return FontWeight.SemiBold;
-            return FontWeight.Normal;
+                return FontWeight.Normal;
+            }
+            throw new ArgumentException("Передан аргумент не являющийся bool", nameof(isDirectory)); ;
         }
 
         public object? ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
         {
+
             return value;
         }
     }
 
-    //Перечисления
-    public enum AppMode
-    {
-        Ready,
-        Updating,
-        Checking,
-    };
 }

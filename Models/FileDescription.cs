@@ -81,8 +81,6 @@ namespace VersionInfoMVVM.Models
         Ok,
         Added,
         Modified,
-        Deleted,
-        Unknown
-
+        Deleted
     }
 }

@@ -13,9 +13,9 @@
   <DockPanel >
   <Menu DockPanel.Dock="Top" Height="20">
     <MenuItem Header="Файл">
-      <MenuItem Header="Открыть" Command="{Binding OnOpenItem}"/>
       <MenuItem Header="Создать" Command="{Binding OnCreateItem}"/>
-      <MenuItem Header="Сохранить" Command="{Binding OnSaveItem}" IsEnabled="{Binding !!CurrentFile}"/>
+      <MenuItem Header="Открыть" Command="{Binding OnOpenItem}"/>
+      <MenuItem Header="Сохранить" Command="{Binding OnSaveItem}"/>
       <MenuItem Header="Сохранить как" Command="{Binding OnSaveAsItem}"/>
       <MenuItem Header="Экспортировать">
         <MenuItem Header="Экспортировать в .txt"></MenuItem>
@@ -35,7 +35,7 @@
       <ListBox Grid.Column="0" Margin="4" Items="{Binding DirectoryData}" SelectedItem="{Binding FolderListBoxItem, Mode=TwoWay}"></ListBox>
       <StackPanel Grid.Column="1">
         <Button Margin="4" Width="90" Command="{Binding OnAddButton}">Добавить</Button>
-        <Button Margin="4" Width="90" Command="{Binding OnDeleteButton}">Удалить</Button>
+        <Button Margin="4" Width="90" Command="{Binding OnDeleteButton}" IsEnabled="{Binding !!FolderListBoxItem}">Удалить</Button>
       </StackPanel>
     </Grid>
 
@@ -71,7 +71,6 @@
                   Items="{Binding FileData}">
               
                 <DataGrid.Columns>
-                  <!--<DataGridTextColumn Header="Имя" Binding="{Binding Name}"/>-->
                   <DataGridTemplateColumn Header="Имя">
                     <DataGridTemplateColumn.CellTemplate>
                       <DataTemplate>
@@ -93,8 +92,8 @@
               </DataGrid>
             
         <StackPanel Grid.Column="1">
-          <Button Margin="4" Width="90" Command="{Binding OnCheckButton}" IsEnabled="{Binding !!CurrentFile}">Сравнить</Button>
-          <Button Margin="4" Width="90" Command="{Binding OnUpdateButton}">Обновить</Button>
+          <Button Margin="4" Width="90" Command="{Binding OnCheckButton}" Content="{Binding CheckButtonText}"></Button>
+          <Button Margin="4" Width="90" Command="{Binding OnUpdateButton}" Content="{Binding UpdateButtonText}"></Button>
         </StackPanel>
       </Grid>
     </DockPanel>
