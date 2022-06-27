@@ -65,12 +65,9 @@ namespace VersionInfoMVVM.ViewModels
             UpdateButtonText = "Обновить";
             CheckButtonText = "Сравнить";
 
-            if (data.fileData != null && data.directoryData != null)
-            {
-                FileData = data.fileData;
-                DirectoryData = data.directoryData;
-            }
-
+            if (data.directoryData != null) DirectoryData = data.directoryData;
+            if (data.fileData != null) FileData = data.fileData;
+                
             //Определение обработчкиов меню
             OnOpenItem = ReactiveCommand.Create(() =>
             {
@@ -196,7 +193,6 @@ namespace VersionInfoMVVM.ViewModels
             });
             OnCheckButton = ReactiveCommand.Create(() => 
             {
-                #region Update
                 if (running)
                 {
                     stopRunning = true;
@@ -232,14 +228,13 @@ namespace VersionInfoMVVM.ViewModels
                         StatusBarText = "Canceled";
                         stopRunning = false;
                     }
-                    #endregion
-                    // FIX: починить работу Check
+
+                    // TODO: дебаг
                     FileData = flist;
 
                     var newFileList = new ObservableCollection<BaseDescription>(FileData);
 
                     //Сравниваем старые и новые данные, изменеяем НОВЫЕ данные 
-                    #region FixThis
                     foreach (var file in newFileList.OfType<FileDescription>())
                     {
                         var found = (FileDescription?)oldFileList.FirstOrDefault(f => f.Path == file.Path);
@@ -269,8 +264,7 @@ namespace VersionInfoMVVM.ViewModels
                         var found = oldFileList.FirstOrDefault(f => f.Path == file.Path);
                         if (found is not null && !file.Equals(found)) file.FileState = FileState.Modified;
                     }
-                    #endregion
-                    FileData = new ObservableCollection<BaseDescription>(newFileList);
+                    FileData = new ObservableCollection<BaseDescription>(newFileList.OrderBy(f => f.Path));
                 });
             });
 
