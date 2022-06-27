@@ -18,10 +18,10 @@
       <MenuItem Header="Сохранить" Command="{Binding OnSaveItem}"/>
       <MenuItem Header="Сохранить как" Command="{Binding OnSaveAsItem}"/>
       <MenuItem Header="Экспортировать">
-        <MenuItem Header="Экспортировать в .txt"></MenuItem>
-        <MenuItem Header="Экспортировать в .csv"></MenuItem>
-        <MenuItem Header="Экспортировать в .docx"></MenuItem>
-        <MenuItem Header="Экспортировать в .xlsx"></MenuItem>
+        <MenuItem Header="Экспортировать в .txt" Command="{Binding ExportToTXT}"></MenuItem>
+        <MenuItem Header="Экспортировать в .csv" Command="{Binding ExportToCSV}"></MenuItem>
+        <MenuItem Header="Экспортировать в .docx" Command="{Binding ExportToDOCX}"></MenuItem>
+        <MenuItem Header="Экспортировать в .xlsx" Command="{Binding ExportToXLSX}"></MenuItem>
       </MenuItem>
       <MenuItem Header="Выйти" Command="{Binding OnCloseItem}"/>
     </MenuItem>

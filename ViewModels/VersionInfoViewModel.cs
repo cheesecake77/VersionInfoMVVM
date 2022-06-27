@@ -19,15 +19,17 @@ using Avalonia.Media.Imaging;
 using Avalonia;
 using Avalonia.Platform;
 using System.Reflection;
+using CsvHelper;
 
 namespace VersionInfoMVVM.ViewModels 
 {
     // AFTERWARDS: всплывающие окна с предложением сохранить после Create, Exit и Open
     // AFTERWARDS: написать unit test'ы
     // AFTERWARDS: рефакторинг
-    // TODO: запись в txt, cvs, docx, xlsx
+    // AFTERWARDS: реализовать MVVM-friendly диалоги
+    // TODO: запись в docx, xlsx
+    // TODO: убрать пустые директории из списков после фильтрации и сравнения
     // HIGHPRIORITY: полностью отладить работу программы, починить работу с данными
-    // HIGHPRIORITY: переделать radioButton'ы (после Check)
     public class VersionInfoViewModel : ViewModelBase
     {
         //Флаги
@@ -41,6 +43,8 @@ namespace VersionInfoMVVM.ViewModels
         public ObservableCollection<BaseDescription>? FileData { get => fileData; set => this.RaiseAndSetIfChanged(ref fileData, value); }
         ObservableCollection<string>? directoryData;
         public ObservableCollection<string>? DirectoryData { get => directoryData; set => this.RaiseAndSetIfChanged(ref directoryData, value); }
+        ObservableCollection<BaseDescription>? savedFileData;
+        public ObservableCollection<BaseDescription>? SavedFileData { get => savedFileData; set => savedFileData = value; }
 
         //Свойства для работы с интерфейсом
         string? selectedItem;
@@ -67,7 +71,8 @@ namespace VersionInfoMVVM.ViewModels
 
             if (data.directoryData != null) DirectoryData = data.directoryData;
             if (data.fileData != null) FileData = data.fileData;
-                
+
+
             //Определение обработчкиов меню
             OnOpenItem = ReactiveCommand.Create(() =>
             {
@@ -97,7 +102,7 @@ namespace VersionInfoMVVM.ViewModels
                     if (CurrentFile != null) CurrentFile = null;
                 }
             });
-            OnSaveItem = ReactiveCommand.Create(async() =>
+            OnSaveItem = ReactiveCommand.Create(async () =>
             {
                 if (CurrentFile is String currentfile)
                 {
@@ -139,6 +144,84 @@ namespace VersionInfoMVVM.ViewModels
                 App.MainWindow.Close();
             });
 
+            //Определение обработчиков подменю
+            ExportToTXT = ReactiveCommand.Create(async() => {
+                //FIX: исправить запись в txt
+                var d = new SaveFileDialog();
+                d.Filters.Add(new FileDialogFilter() { Name = "Текстовый документ", Extensions = { "txt" } });
+                var res = await d.ShowAsync(App.MainWindow);
+                if (res != null)
+                {
+                    using (var writer = new StreamWriter(res, false))
+                    {
+                        writer.WriteLine($"{"Имя",-108} {"Состояние",-8}\t{"Версия",-10}" +
+                                    $"\t{"Время",-19}\t{"Размер",-9}\t{"Хэш",-32}");
+                        for (int i = 0; i < FileData.Count; i++)
+                        {
+                            if (FileData[i] is DirectoryDescription)
+                            {
+                                writer.WriteLine();
+                                writer.WriteLine($"{FileData[i].Name}");
+                            }
+
+                            if (FileData[i] is FileDescription fd)
+                            {
+                                writer.WriteLine($"{fd.Name,-108} {fd.FileState,-8}\t{fd.Version,-10}" +
+                                    $"\t{fd.Time:dd-MM-yyyy HH:mm:ss}\t{fd.Size,-9}\t{fd.Hash,-32}");
+                            }
+                        }
+                    }
+                }
+            });
+            ExportToCSV = ReactiveCommand.Create(async () => {
+                // FIX: исправить запись в csv
+                var d = new SaveFileDialog();
+                d.Filters.Add(new FileDialogFilter() { Name = "CSV - файл", Extensions = { "csv" } });
+                var res = await d.ShowAsync(App.MainWindow);
+                if (res != null)
+                {
+                    using (var writer = new StreamWriter(res))
+                    {
+
+                        using (var csv = new CsvWriter(writer, CultureInfo.InvariantCulture))
+                        {
+                            csv.WriteRecords(FileData.ToList());
+                        }
+                    }
+                }
+            });
+            ExportToDOCX = ReactiveCommand.Create(async () => {
+                // HIGHPRIORITY: сделать экспорт в docx
+                var d = new SaveFileDialog();
+                d.Filters.Add(new FileDialogFilter() { Name = "Документы Word", Extensions = { "docx" } });
+                var res = await d.ShowAsync(App.MainWindow);
+                if (res != null)
+                {
+                    using (var writer = new StreamWriter(res, false))
+                    {
+                        writer.WriteLine($"{"Имя"}\t{"Состояние"}\t{"Версия"}" +
+                                    $"\t{"Время"}\t{"Размер"}\t{"Хэш"}");
+                        for (int i = 0; i < FileData.Count; i++)
+                        {
+                            if (FileData[i] is DirectoryDescription)
+                            {
+                                writer.WriteLine();
+                                writer.WriteLine($"{FileData[i].Name}");
+                            }
+
+                            if (FileData[i] is FileDescription fd)
+                            {
+                                writer.WriteLine($"{fd.Name}\t{fd.FileState}\t{fd.Version}" +
+                                    $"\t{fd.Time:dd-MM-yyyy HH:mm:ss}\t{fd.Size}\t{fd.Hash}");
+                            }
+                        }
+                    }
+                }
+            });
+            ExportToXLSX = ReactiveCommand.Create(async () => {
+                //HIGHPRIORITY: сделть экспорт в xlsx
+            });
+
             //Определение обработчиков кнопок
             OnAddButton = ReactiveCommand.Create(async () =>
             {
@@ -155,6 +238,7 @@ namespace VersionInfoMVVM.ViewModels
                 }
                 DirectoryData.Remove(folder);
                 foreach (var file in FileData.Where(f => f.Path.StartsWith(folder)).ToList()) FileData.Remove(file);
+                SavedFileData = new ObservableCollection<BaseDescription>(FileData);
             });
             OnUpdateButton = ReactiveCommand.Create(() =>
             {
@@ -183,15 +267,18 @@ namespace VersionInfoMVVM.ViewModels
                 }).ContinueWith(t => {
                     StatusBarText = "Готово";
                     UpdateButtonText = "Обновить";
+                    running = false;
                     if (t.IsFaulted)
                     {
                         StatusBarText = "Update canceled";
                         stopRunning = false;
+                        running = false;
                     }
                     FileData = flist;
+                    SavedFileData = flist;
                 });
             });
-            OnCheckButton = ReactiveCommand.Create(() => 
+            OnCheckButton = ReactiveCommand.Create(() =>
             {
                 if (running)
                 {
@@ -223,13 +310,14 @@ namespace VersionInfoMVVM.ViewModels
                 {
                     StatusBarText = "Готово";
                     CheckButtonText = "Сравнить";
+                    running = false;
                     if (t.IsFaulted)
                     {
                         StatusBarText = "Canceled";
                         stopRunning = false;
+                        running = false;
                     }
 
-                    // TODO: дебаг
                     FileData = flist;
 
                     var newFileList = new ObservableCollection<BaseDescription>(FileData);
@@ -262,23 +350,49 @@ namespace VersionInfoMVVM.ViewModels
                     foreach (var file in newFileList.OfType<FileDescription>())
                     {
                         var found = oldFileList.FirstOrDefault(f => f.Path == file.Path);
-                        if (found is not null && !file.Equals(found)) file.FileState = FileState.Modified;
+                        if (found is not null && !file.Equals((FileDescription)found)) file.FileState = FileState.Modified;
                     }
                     FileData = new ObservableCollection<BaseDescription>(newFileList.OrderBy(f => f.Path));
+                    savedFileData = new ObservableCollection<BaseDescription>(FileData);
                 });
             });
 
             //Определение обработчиков RadioButton'ов
             OnAllRadioButton = ReactiveCommand.Create(() => {
+                if (SavedFileData is not null) FileData = new ObservableCollection<BaseDescription>(SavedFileData);
             });
             OnAddedRadioButton = ReactiveCommand.Create(() => {
-                
+                if (FileData is null) return;
+                if (SavedFileData is null) return;
+                FileData.Clear();
+                foreach (var file in SavedFileData)
+                {
+                    if (file is DirectoryDescription) FileData.Add(file);
+                    if (file is FileDescription fd)
+                        if (fd.FileState == FileState.Added) FileData.Add(fd);
+                }
             });
             OnDeletedRadioButton = ReactiveCommand.Create(() => {
-
+                if (FileData is null) return;
+                if (SavedFileData is null) return;
+                FileData.Clear();
+                foreach (var file in SavedFileData)
+                {
+                    if (file is DirectoryDescription) FileData.Add(file);
+                    if (file is FileDescription fd)
+                        if (fd.FileState == FileState.Deleted) FileData.Add(fd);
+                }
             });
             OnModifiedRadioButton = ReactiveCommand.Create(() => {
-                
+                if (FileData is null) return;
+                if (SavedFileData is null) return;
+                FileData.Clear();
+                foreach (var file in SavedFileData)
+                {
+                    if (file is DirectoryDescription) FileData.Add(file);
+                    if (file is FileDescription fd)
+                        if (fd.FileState == FileState.Modified) FileData.Add(fd);
+                }
             });
 
         }
@@ -288,6 +402,12 @@ namespace VersionInfoMVVM.ViewModels
         public ReactiveCommand<Unit, Task> OnSaveItem { get; }
         public ReactiveCommand<Unit, Task> OnSaveAsItem { get; }
         public ReactiveCommand<Unit, Unit> OnCloseItem { get; }
+
+        //Объвление обработчиков подменю
+        public ReactiveCommand<Unit, Task> ExportToTXT { get; }
+        public ReactiveCommand<Unit, Task> ExportToCSV { get; }
+        public ReactiveCommand<Unit, Task> ExportToDOCX { get; }
+        public ReactiveCommand<Unit, Task> ExportToXLSX { get; }
 
         //Объявление обработчиков кнопок
         public ReactiveCommand<Unit, Task> OnAddButton { get; }
@@ -300,6 +420,7 @@ namespace VersionInfoMVVM.ViewModels
         public ReactiveCommand<Unit, Unit> OnAddedRadioButton { get; }
         public ReactiveCommand<Unit, Unit> OnDeletedRadioButton { get; }
         public ReactiveCommand<Unit, Unit> OnModifiedRadioButton { get; }
+
 
         //Вспомогательные методы
         private void FindFiles(string directory, ObservableCollection<BaseDescription> files)
