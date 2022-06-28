@@ -20,6 +20,11 @@ using Avalonia;
 using Avalonia.Platform;
 using System.Reflection;
 using CsvHelper;
+using DocumentFormat.OpenXml.Packaging;
+using DocumentFormat.OpenXml.Wordprocessing;
+using Run = DocumentFormat.OpenXml.Wordprocessing.Run;
+using Text = DocumentFormat.OpenXml.Wordprocessing.Text;
+using DocumentFormat.OpenXml.Spreadsheet;
 
 namespace VersionInfoMVVM.ViewModels 
 {
@@ -27,9 +32,6 @@ namespace VersionInfoMVVM.ViewModels
     // AFTERWARDS: написать unit test'ы
     // AFTERWARDS: рефакторинг
     // AFTERWARDS: реализовать MVVM-friendly диалоги
-    // TODO: запись в docx, xlsx
-    // TODO: убрать пустые директории из списков после фильтрации и сравнения
-    // HIGHPRIORITY: полностью отладить работу программы, починить работу с данными
     public class VersionInfoViewModel : ViewModelBase
     {
         //Флаги
@@ -88,7 +90,8 @@ namespace VersionInfoMVVM.ViewModels
                     if (input != null)
                     {
                         DirectoryData = input.directoryData;
-                        FileData = input.fileData;
+                        FileData = new ObservableCollection<BaseDescription>(input.fileData);
+                        SavedFileData = new ObservableCollection<BaseDescription>(input.fileData);
                     }
 
                 }
@@ -146,7 +149,6 @@ namespace VersionInfoMVVM.ViewModels
 
             //Определение обработчиков подменю
             ExportToTXT = ReactiveCommand.Create(async() => {
-                //FIX: исправить запись в txt
                 var d = new SaveFileDialog();
                 d.Filters.Add(new FileDialogFilter() { Name = "Текстовый документ", Extensions = { "txt" } });
                 var res = await d.ShowAsync(App.MainWindow);
@@ -154,8 +156,21 @@ namespace VersionInfoMVVM.ViewModels
                 {
                     using (var writer = new StreamWriter(res, false))
                     {
-                        writer.WriteLine($"{"Имя",-108} {"Состояние",-8}\t{"Версия",-10}" +
-                                    $"\t{"Время",-19}\t{"Размер",-9}\t{"Хэш",-32}");
+                        var timeFormat = "dd-MM-yyyy HH:mm:ss";
+                        int nameLength = FileData.Max(f => f.Name.Length);
+                        int stateLength = 8;
+                        int versionLength = FileData.OfType<FileDescription>().Max(f => f.Version.Length);
+                        int timeLength = timeFormat.Length;
+                        int sizeLength = FileData.OfType<FileDescription>().Max(f => f.Size.ToString().Length);
+                        int hashSize = 32;
+
+                        var fileFormat = string.Format("{{0, -{0}}} {{1,-{1}}} {{2,-{2}}} " +
+                            "{{3,-{3}}} {{4,{4}}} {{5,-{5}}}", nameLength, stateLength, versionLength, timeLength, sizeLength, hashSize);
+
+                        var headerFormat = string.Format("{{0, -{0}}} {{1,-{1}}} {{2,-{2}}} " +
+                            "{{3,-{3}}} {{4,-{4}}} {{5,-{5}}}", nameLength, stateLength, versionLength, timeLength, sizeLength, hashSize);
+
+                        writer.WriteLine(String.Format(headerFormat, "Имя", "Состояние", "Версия", "Время", "Размер", "Хэш"));
                         for (int i = 0; i < FileData.Count; i++)
                         {
                             if (FileData[i] is DirectoryDescription)
@@ -166,8 +181,7 @@ namespace VersionInfoMVVM.ViewModels
 
                             if (FileData[i] is FileDescription fd)
                             {
-                                writer.WriteLine($"{fd.Name,-108} {fd.FileState,-8}\t{fd.Version,-10}" +
-                                    $"\t{fd.Time:dd-MM-yyyy HH:mm:ss}\t{fd.Size,-9}\t{fd.Hash,-32}");
+                                writer.WriteLine(String.Format(fileFormat, fd.Name, fd.FileState, fd.Version, fd.Time.ToString(timeFormat), fd.Size, fd.Hash));
                             }
                         }
                     }
@@ -175,51 +189,88 @@ namespace VersionInfoMVVM.ViewModels
             });
             ExportToCSV = ReactiveCommand.Create(async () => {
                 // FIX: исправить запись в csv
+                var timeFormat = "dd-MM-yyyy HH:mm:ss";
                 var d = new SaveFileDialog();
                 d.Filters.Add(new FileDialogFilter() { Name = "CSV - файл", Extensions = { "csv" } });
                 var res = await d.ShowAsync(App.MainWindow);
                 if (res != null)
                 {
-                    using (var writer = new StreamWriter(res))
+                    using (var writer = new StreamWriter(res, false, Encoding.BigEndianUnicode))
                     {
-
-                        using (var csv = new CsvWriter(writer, CultureInfo.InvariantCulture))
+                        writer.WriteLine($"{"Name"};{"FileState"};{"Version"};{"Time"};{"Size"};{"Hash"};");
+                        for (int i = 0; i < FileData.Count; i++)
                         {
-                            csv.WriteRecords(FileData.ToList());
+                            if (FileData[i] is DirectoryDescription dd) writer.WriteLine(dd.Name + ";");
+                            if (FileData[i] is FileDescription fd) writer.WriteLine($"{fd.Name};{fd.FileState};{fd.Version};{fd.Time.ToString(timeFormat)};{fd.Size};{fd.Hash}");
                         }
                     }
                 }
             });
             ExportToDOCX = ReactiveCommand.Create(async () => {
-                // HIGHPRIORITY: сделать экспорт в docx
+                // HIGHPRIORITY: исправить запись в docx
                 var d = new SaveFileDialog();
                 d.Filters.Add(new FileDialogFilter() { Name = "Документы Word", Extensions = { "docx" } });
                 var res = await d.ShowAsync(App.MainWindow);
                 if (res != null)
                 {
-                    using (var writer = new StreamWriter(res, false))
+                    using (var doc = WordprocessingDocument.Create(res, DocumentFormat.OpenXml.WordprocessingDocumentType.Document))
                     {
-                        writer.WriteLine($"{"Имя"}\t{"Состояние"}\t{"Версия"}" +
-                                    $"\t{"Время"}\t{"Размер"}\t{"Хэш"}");
+                        var timeFormat = "dd-MM-yyyy HH:mm:ss";
+                        int nameLength = 0;
+                        int stateLength = 8;
+                        int versionLength = FileData.OfType<FileDescription>().Max(f => f.Version.Length);
+                        int timeLength = timeFormat.Length;
+                        int sizeLength = FileData.OfType<FileDescription>().Max(f => f.Size.ToString().Length);
+                        int hashSize = 32;
+
+                        var fileFormat = string.Format("{{0, -{0}}} {{1,-{1}}} {{2,-{2}}} " +
+                            "{{3,-{3}}} {{4,-{4}}} {{5,-{5}}}", nameLength, stateLength, versionLength, timeLength, sizeLength, hashSize);
+
+                        var headerFormat = string.Format("{{0, -{0}}} {{1,-{1}}} {{2,-{2}}} " +
+                            "{{3,-{3}}} {{4,-{4}}} {{5,-{5}}}", nameLength, stateLength, versionLength, timeLength, sizeLength, hashSize);
+
+                        MainDocumentPart mainPart = doc.AddMainDocumentPart();
+                        mainPart.Document = new Document();
+                        Body body = mainPart.Document.AppendChild(new Body());
                         for (int i = 0; i < FileData.Count; i++)
                         {
-                            if (FileData[i] is DirectoryDescription)
-                            {
-                                writer.WriteLine();
-                                writer.WriteLine($"{FileData[i].Name}");
-                            }
-
-                            if (FileData[i] is FileDescription fd)
-                            {
-                                writer.WriteLine($"{fd.Name}\t{fd.FileState}\t{fd.Version}" +
-                                    $"\t{fd.Time:dd-MM-yyyy HH:mm:ss}\t{fd.Size}\t{fd.Hash}");
-                            }
+                            Paragraph para = body.AppendChild(new Paragraph());
+                            Run run = para.AppendChild(new Run());
+                            if (FileData[i] is DirectoryDescription dd) run.AppendChild(new Text($"{dd.Name}"));
+                            if (FileData[i] is FileDescription fd) run.AppendChild(new Text(String.Format(fileFormat, fd.Name, 
+                                fd.FileState, fd.Version, fd.Time.ToString(timeFormat), fd.Size, fd.Hash)));
+                            
                         }
+                        doc.Save();
+                        doc.Close();
                     }
                 }
             });
             ExportToXLSX = ReactiveCommand.Create(async () => {
-                //HIGHPRIORITY: сделть экспорт в xlsx
+                //HIGHPRIORITY: сделать экспорт в xlsx
+                var d = new SaveFileDialog();
+                d.Filters.Add(new FileDialogFilter() { Name = "Документы Excel", Extensions = { "xlsx" } });
+                var res = await d.ShowAsync(App.MainWindow);
+                if (res != null)
+                {
+                    using (var doc = SpreadsheetDocument.Create(res, DocumentFormat.OpenXml.SpreadsheetDocumentType.Workbook))
+                    {
+                        WorkbookPart workbookpart = doc.AddWorkbookPart();
+                        workbookpart.Workbook = new Workbook();
+                        WorksheetPart worksheetPart = workbookpart.AddNewPart<WorksheetPart>();
+                        worksheetPart.Worksheet = new Worksheet(new SheetData());
+                        Sheets sheets = doc.WorkbookPart.Workbook.AppendChild<Sheets>(new Sheets());
+                        Sheet sheet = new Sheet()
+                        {
+                            Id = doc.WorkbookPart.GetIdOfPart(worksheetPart),
+                            SheetId = 1,
+                            Name = "1"
+                        };
+                        sheets.Append(sheet);
+
+
+                    }
+                }
             });
 
             //Определение обработчиков кнопок
@@ -274,8 +325,8 @@ namespace VersionInfoMVVM.ViewModels
                         stopRunning = false;
                         running = false;
                     }
-                    FileData = flist;
-                    SavedFileData = flist;
+                    FileData = new ObservableCollection<BaseDescription>(flist);
+                    SavedFileData = new ObservableCollection<BaseDescription>(flist);
                 });
             });
             OnCheckButton = ReactiveCommand.Create(() =>
@@ -352,8 +403,10 @@ namespace VersionInfoMVVM.ViewModels
                         var found = oldFileList.FirstOrDefault(f => f.Path == file.Path);
                         if (found is not null && !file.Equals((FileDescription)found)) file.FileState = FileState.Modified;
                     }
+                    //Запись данных
                     FileData = new ObservableCollection<BaseDescription>(newFileList.OrderBy(f => f.Path));
                     savedFileData = new ObservableCollection<BaseDescription>(FileData);
+                    RemoveEmptyFolders();
                 });
             });
 
@@ -371,6 +424,7 @@ namespace VersionInfoMVVM.ViewModels
                     if (file is FileDescription fd)
                         if (fd.FileState == FileState.Added) FileData.Add(fd);
                 }
+                RemoveEmptyFolders();
             });
             OnDeletedRadioButton = ReactiveCommand.Create(() => {
                 if (FileData is null) return;
@@ -382,6 +436,7 @@ namespace VersionInfoMVVM.ViewModels
                     if (file is FileDescription fd)
                         if (fd.FileState == FileState.Deleted) FileData.Add(fd);
                 }
+                RemoveEmptyFolders();
             });
             OnModifiedRadioButton = ReactiveCommand.Create(() => {
                 if (FileData is null) return;
@@ -393,6 +448,7 @@ namespace VersionInfoMVVM.ViewModels
                     if (file is FileDescription fd)
                         if (fd.FileState == FileState.Modified) FileData.Add(fd);
                 }
+                RemoveEmptyFolders();
             });
 
         }
@@ -445,6 +501,19 @@ namespace VersionInfoMVVM.ViewModels
                     if (stopRunning) throw new Exception();
                     FindFiles(d, files);
                 }
+        }
+        private void RemoveEmptyFolders()
+        {
+            foreach (var f in FileData.OfType<DirectoryDescription>().ToList()) 
+            {
+                if (FileData.IndexOf(f) == FileData.Count - 1)
+                {
+                    FileData.Remove(f);
+                    return;
+                }
+
+                if (FileData[FileData.IndexOf(f)+1] is DirectoryDescription) FileData.Remove(f);
+            }
         }
     }
 
