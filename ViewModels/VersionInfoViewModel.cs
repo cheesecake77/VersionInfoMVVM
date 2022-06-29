@@ -19,7 +19,6 @@ using Avalonia.Media.Imaging;
 using Avalonia;
 using Avalonia.Platform;
 using System.Reflection;
-using CsvHelper;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Wordprocessing;
 using Run = DocumentFormat.OpenXml.Wordprocessing.Run;
@@ -32,6 +31,7 @@ namespace VersionInfoMVVM.ViewModels
     // AFTERWARDS: написать unit test'ы
     // AFTERWARDS: рефакторинг
     // AFTERWARDS: реализовать MVVM-friendly диалоги
+    // TODO: добавить проверки для работы с файлами
     public class VersionInfoViewModel : ViewModelBase
     {
         //Флаги
@@ -188,20 +188,19 @@ namespace VersionInfoMVVM.ViewModels
                 }
             });
             ExportToCSV = ReactiveCommand.Create(async () => {
-                // FIX: исправить запись в csv
                 var timeFormat = "dd-MM-yyyy HH:mm:ss";
                 var d = new SaveFileDialog();
                 d.Filters.Add(new FileDialogFilter() { Name = "CSV - файл", Extensions = { "csv" } });
                 var res = await d.ShowAsync(App.MainWindow);
                 if (res != null)
                 {
-                    using (var writer = new StreamWriter(res, false, Encoding.BigEndianUnicode))
+                    using (var writer = new StreamWriter(res, false, Encoding.UTF8))
                     {
                         writer.WriteLine($"{"Name"};{"FileState"};{"Version"};{"Time"};{"Size"};{"Hash"};");
                         for (int i = 0; i < FileData.Count; i++)
                         {
                             if (FileData[i] is DirectoryDescription dd) writer.WriteLine(dd.Name + ";");
-                            if (FileData[i] is FileDescription fd) writer.WriteLine($"{fd.Name};{fd.FileState};{fd.Version};{fd.Time.ToString(timeFormat)};{fd.Size};{fd.Hash}");
+                            if (FileData[i] is FileDescription fd) writer.WriteLine($"{fd.Name};{fd.FileState};{fd.Version};{fd.Time.ToString(timeFormat)};{fd.Size};{fd.Hash};");
                         }
                     }
                 }
@@ -247,7 +246,6 @@ namespace VersionInfoMVVM.ViewModels
                 }
             });
             ExportToXLSX = ReactiveCommand.Create(async () => {
-                //HIGHPRIORITY: сделать экспорт в xlsx
                 var d = new SaveFileDialog();
                 d.Filters.Add(new FileDialogFilter() { Name = "Документы Excel", Extensions = { "xlsx" } });
                 var res = await d.ShowAsync(App.MainWindow);
@@ -255,6 +253,15 @@ namespace VersionInfoMVVM.ViewModels
                 {
                     using (var doc = SpreadsheetDocument.Create(res, DocumentFormat.OpenXml.SpreadsheetDocumentType.Workbook))
                     {
+                        var timeFormat = "dd-MM-yyyy HH:mm:ss";
+                        int nameLength = FileData.Max(f => f.Name.Length);
+                        int stateLength = 10;
+                        int versionLength = FileData.OfType<FileDescription>().Max(f => f.Version.Length)  > "Версия".Length + 1 ? FileData.OfType<FileDescription>().Max(f => f.Version.Length) : "Версия".Length + 1;
+                        int timeLength = timeFormat.Length;
+                        int sizeLength = FileData.OfType<FileDescription>().Max(f => f.Size.ToString().Length) > "Размер".Length ? FileData.OfType<FileDescription>().Max(f => f.Size.ToString().Length) : "Размер".Length + 1;
+                        int hashLength = 34;
+                        List<int> ColumnsWidths = new() { nameLength, stateLength, versionLength, timeLength, sizeLength, hashLength };
+
                         WorkbookPart workbookpart = doc.AddWorkbookPart();
                         workbookpart.Workbook = new Workbook();
                         WorksheetPart worksheetPart = workbookpart.AddNewPart<WorksheetPart>();
@@ -264,12 +271,116 @@ namespace VersionInfoMVVM.ViewModels
                         {
                             Id = doc.WorkbookPart.GetIdOfPart(worksheetPart),
                             SheetId = 1,
-                            Name = "1"
+                            Name = "Список файлов"
                         };
                         sheets.Append(sheet);
 
+                        Worksheet worksheet = new Worksheet();
+                        SheetViews sheetViews = new SheetViews();
+                        SheetView sheetView = new SheetView() { TabSelected = true, WorkbookViewId = 0U };
+                        sheetViews.Append(sheetView);
+                        SheetFormatProperties sheetFormatProperties = new SheetFormatProperties() { DefaultRowHeight = 15D, DyDescent = 0.25D };
+
+                        DocumentFormat.OpenXml.Spreadsheet.Columns columns = new DocumentFormat.OpenXml.Spreadsheet.Columns();
+
+                        for (int i = 0; i < ColumnsWidths.Count; i++)
+                        {
+                            columns.Append(new DocumentFormat.OpenXml.Spreadsheet.Column() { Min = (uint)i + 2, Max = (uint)i + 2, Width = ColumnsWidths[i] }); 
+                        }
+
+                        SheetData sheetData = new SheetData();
+                        var header = new Row() { RowIndex = 1 };
+                        header.Append(new Cell());
+                        header.Append(new Cell()
+                        {
+                            CellValue = new CellValue("Имя"),
+                            DataType = new DocumentFormat.OpenXml.EnumValue<CellValues>(CellValues.String)
+                        });
+                        header.Append(new Cell() 
+                        {
+                            CellValue = new CellValue("Состояние"),
+                            DataType = new DocumentFormat.OpenXml.EnumValue<CellValues>(CellValues.String)
+                        });
+                        header.Append(new Cell()
+                        {
+                            CellValue = new CellValue("Версия"),
+                            DataType = new DocumentFormat.OpenXml.EnumValue<CellValues>(CellValues.String)
+                        });
+                        header.Append(new Cell()
+                        {
+                            CellValue = new CellValue("Время"),
+                            DataType = new DocumentFormat.OpenXml.EnumValue<CellValues>(CellValues.String)
+                        });
+                        header.Append(new Cell()
+                        {
+                            CellValue = new CellValue("Размер"),
+                            DataType = new DocumentFormat.OpenXml.EnumValue<CellValues>(CellValues.String)
+                        });
+                        header.Append(new Cell()
+                        {
+                            CellValue = new CellValue("Хэш"),
+                            DataType = new DocumentFormat.OpenXml.EnumValue<CellValues>(CellValues.String)
+                        });
+                        sheetData.Append(header);
+
+                        for (int r = 0; r < FileData.Count; r++)
+                        {
+                            var row = new Row { RowIndex = (uint)r + 2 };
+                            row.Append(new Cell());
+                            if (FileData[r] is DirectoryDescription)
+                            {
+                                row.Append(new Cell()
+                                {
+                                    CellValue = new CellValue(FileData[r].Name),
+                                    DataType = new DocumentFormat.OpenXml.EnumValue<CellValues>(CellValues.String)
+                                });
+                            }
+                            else if (FileData[r] is FileDescription fd)
+                            {
+                                row.Append(new Cell()
+                                {
+                                    CellValue = new CellValue(fd.Name),
+                                    DataType = new DocumentFormat.OpenXml.EnumValue<CellValues>(CellValues.String)
+                                }); ;
+                                row.Append(new Cell()
+                                {
+                                    CellValue = new CellValue(fd.FileState.ToString()),
+                                    DataType = new DocumentFormat.OpenXml.EnumValue<CellValues>(CellValues.String)
+                                });
+                                row.Append(new Cell()
+                                {
+                                    CellValue = new CellValue(fd.Version),
+                                    DataType = new DocumentFormat.OpenXml.EnumValue<CellValues>(CellValues.String)
+                                }); ;
+                                // TODO: проверить, можно ли записывать время как string
+                                row.Append(new Cell()
+                                {
+                                    CellValue = new CellValue(fd.Time.ToString(timeFormat)),
+                                    DataType = new DocumentFormat.OpenXml.EnumValue<CellValues>(CellValues.String)
+                                });
+                                row.Append(new Cell()
+                                {
+                                    CellValue = new CellValue((double)fd.Size),
+                                    DataType = new DocumentFormat.OpenXml.EnumValue<CellValues>(CellValues.Number)
+                                });
+                                row.Append(new Cell()
+                                {
+                                    CellValue = new CellValue(fd.Hash),
+                                    DataType = new DocumentFormat.OpenXml.EnumValue<CellValues>(CellValues.String)
+                                });
+                            }
+                            sheetData.Append(row);
+                        }
+                        worksheet.Append(sheetViews);
+                        worksheet.Append(sheetFormatProperties);
+                        worksheet.Append(columns);
+                        worksheet.Append(sheetData);
+
+                        worksheetPart.Worksheet = worksheet;
+                        doc.Close();
 
                     }
+
                 }
             });
 
