@@ -64,6 +64,7 @@
       <Grid ColumnDefinitions="* 100">
         <DataGrid Grid.Column="0" Name="fileDataGrid" 
                   VerticalScrollBarVisibility="Visible"
+                  HorizontalScrollBarVisibility="Visible"
                   CanUserReorderColumns="True"
                   CanUserResizeColumns="True"
                   CanUserSortColumns="True"
@@ -71,7 +72,9 @@
                   Items="{Binding FileData}">
               
                 <DataGrid.Columns>
-                  <DataGridTemplateColumn Header="Имя">
+                  <DataGridTemplateColumn Header="Имя" CanUserReorder="True"
+                                          CanUserResize="True"
+                                          CanUserSort="True">
                     <DataGridTemplateColumn.CellTemplate>
                       <DataTemplate>
                         <StackPanel Orientation="Horizontal" 
@@ -83,11 +86,26 @@
                       </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                   </DataGridTemplateColumn>
-                  <DataGridTextColumn Header="Состояние" Binding="{Binding FileState, Converter={StaticResource fileStateConverter}}"/>
-                  <DataGridTextColumn Header="Версия" Binding="{Binding Version}"/>
-                  <DataGridTextColumn Header="Время"  Binding="{Binding Time}"/>
-                  <DataGridTextColumn Header="Размер" Binding="{Binding Size}"/>
-                  <DataGridTextColumn Header="Хэш" Binding="{Binding Hash}"/>
+                  <DataGridTextColumn Header="Состояние" Binding="{Binding FileState, Converter={StaticResource fileStateConverter}}"
+                                      CanUserReorder="True"
+                                          CanUserResize="True"
+                                          CanUserSort="True"/>
+                  <DataGridTextColumn Header="Версия" Binding="{Binding Version}"
+                                      CanUserReorder="True"
+                                          CanUserResize="True"
+                                          CanUserSort="True"/>
+                  <DataGridTextColumn Header="Время"  Binding="{Binding Time}"
+                                      CanUserReorder="True"
+                                          CanUserResize="True"
+                                          CanUserSort="True"/>
+                  <DataGridTextColumn Header="Размер" Binding="{Binding Size}"
+                                      CanUserReorder="True"
+                                          CanUserResize="True"
+                                          CanUserSort="True"/>
+                  <DataGridTextColumn Header="Хэш" Binding="{Binding Hash}"
+                                      CanUserReorder="True"
+                                          CanUserResize="True"
+                                          CanUserSort="True"/>
                 </DataGrid.Columns>
               </DataGrid>
             

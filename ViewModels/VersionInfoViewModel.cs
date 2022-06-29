@@ -31,6 +31,7 @@ namespace VersionInfoMVVM.ViewModels
     // AFTERWARDS: написать unit test'ы
     // AFTERWARDS: рефакторинг
     // AFTERWARDS: реализовать MVVM-friendly диалоги
+    // AFTERWARDS: "отдебажить" UI
     public class VersionInfoViewModel : ViewModelBase
     {
         //Флаги
@@ -528,6 +529,7 @@ namespace VersionInfoMVVM.ViewModels
                     FileData = new ObservableCollection<BaseDescription>(newFileList.OrderBy(f => f.Path));
                     savedFileData = new ObservableCollection<BaseDescription>(FileData);
                     RemoveEmptyFolders();
+
                 });
             });
 
@@ -625,7 +627,7 @@ namespace VersionInfoMVVM.ViewModels
         }
         private void RemoveEmptyFolders()
         {
-            // TODO: дебаг RemoveEmptyFolders
+            // TODO: дебаг RemoveEmptyFolders, по возможности реализовать добавление удаленных и добавленных файлов в то же место списка, где они находились до Check
             foreach (var f in FileData.OfType<DirectoryDescription>().ToList()) 
             {
                 if (FileData.IndexOf(f) == FileData.Count - 1)
