@@ -31,7 +31,6 @@ namespace VersionInfoMVVM.ViewModels
     // AFTERWARDS: написать unit test'ы
     // AFTERWARDS: рефакторинг
     // AFTERWARDS: реализовать MVVM-friendly диалоги
-    // TODO: добавить проверки для работы с файлами
     public class VersionInfoViewModel : ViewModelBase
     {
         //Флаги
