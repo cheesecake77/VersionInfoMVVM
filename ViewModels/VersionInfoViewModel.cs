@@ -31,7 +31,6 @@ namespace VersionInfoMVVM.ViewModels
     // AFTERWARDS: написать unit test'ы
     // AFTERWARDS: рефакторинг
     // AFTERWARDS: реализовать MVVM-friendly диалоги
-    // TODO: добавить проверки для работы с файлами
     public class VersionInfoViewModel : ViewModelBase
     {
         //Флаги
@@ -206,7 +205,7 @@ namespace VersionInfoMVVM.ViewModels
                 }
             });
             ExportToDOCX = ReactiveCommand.Create(async () => {
-                // HIGHPRIORITY: исправить запись в docx
+                var timeFormat = "dd-MM-yyyy HH:mm:ss";
                 var d = new SaveFileDialog();
                 d.Filters.Add(new FileDialogFilter() { Name = "Документы Word", Extensions = { "docx" } });
                 var res = await d.ShowAsync(App.MainWindow);
@@ -214,32 +213,44 @@ namespace VersionInfoMVVM.ViewModels
                 {
                     using (var doc = WordprocessingDocument.Create(res, DocumentFormat.OpenXml.WordprocessingDocumentType.Document))
                     {
-                        var timeFormat = "dd-MM-yyyy HH:mm:ss";
-                        int nameLength = 0;
-                        int stateLength = 8;
-                        int versionLength = FileData.OfType<FileDescription>().Max(f => f.Version.Length);
-                        int timeLength = timeFormat.Length;
-                        int sizeLength = FileData.OfType<FileDescription>().Max(f => f.Size.ToString().Length);
-                        int hashSize = 32;
-
-                        var fileFormat = string.Format("{{0, -{0}}} {{1,-{1}}} {{2,-{2}}} " +
-                            "{{3,-{3}}} {{4,-{4}}} {{5,-{5}}}", nameLength, stateLength, versionLength, timeLength, sizeLength, hashSize);
-
-                        var headerFormat = string.Format("{{0, -{0}}} {{1,-{1}}} {{2,-{2}}} " +
-                            "{{3,-{3}}} {{4,-{4}}} {{5,-{5}}}", nameLength, stateLength, versionLength, timeLength, sizeLength, hashSize);
-
                         MainDocumentPart mainPart = doc.AddMainDocumentPart();
                         mainPart.Document = new Document();
                         Body body = mainPart.Document.AppendChild(new Body());
+
                         for (int i = 0; i < FileData.Count; i++)
                         {
-                            Paragraph para = body.AppendChild(new Paragraph());
-                            Run run = para.AppendChild(new Run());
-                            if (FileData[i] is DirectoryDescription dd) run.AppendChild(new Text($"{dd.Name}"));
-                            if (FileData[i] is FileDescription fd) run.AppendChild(new Text(String.Format(fileFormat, fd.Name, 
-                                fd.FileState, fd.Version, fd.Time.ToString(timeFormat), fd.Size, fd.Hash)));
-                            
+                            if (FileData[i] is FileDescription fd)
+                            {
+                                Paragraph para = body.AppendChild(new Paragraph());
+                                Run run = para.AppendChild(new Run());
+                                run.AppendChild(new Text($"Имя: {fd.Path}"));
+                                
+                                para = body.AppendChild(new Paragraph()); 
+                                run = para.AppendChild(new Run());
+                                run.AppendChild(new Text($"Состояние: {fd.FileState}"));
+
+                                para = body.AppendChild(new Paragraph());
+                                run = para.AppendChild(new Run());
+                                run.AppendChild(new Text($"Версия: {fd.Version}"));
+
+                                para = body.AppendChild(new Paragraph());
+                                run = para.AppendChild(new Run());
+                                run.AppendChild(new Text($"Время: {fd.Time}"));
+
+                                para = body.AppendChild(new Paragraph());
+                                run = para.AppendChild(new Run());
+                                run.AppendChild(new Text($"Рамер: {fd.Size}"));
+
+                                para = body.AppendChild(new Paragraph());
+                                run = para.AppendChild(new Run());
+                                run.AppendChild(new Text($"Хэш: {fd.Hash}"));
+
+                                para = body.AppendChild(new Paragraph());
+                                run = para.AppendChild(new Run());
+                                run.AppendChild(new Text(""));
+                            }
                         }
+
                         doc.Save();
                         doc.Close();
                     }
@@ -352,7 +363,6 @@ namespace VersionInfoMVVM.ViewModels
                                     CellValue = new CellValue(fd.Version),
                                     DataType = new DocumentFormat.OpenXml.EnumValue<CellValues>(CellValues.String)
                                 }); ;
-                                // TODO: проверить, можно ли записывать время как string
                                 row.Append(new Cell()
                                 {
                                     CellValue = new CellValue(fd.Time.ToString(timeFormat)),
@@ -615,6 +625,7 @@ namespace VersionInfoMVVM.ViewModels
         }
         private void RemoveEmptyFolders()
         {
+            // TODO: дебаг RemoveEmptyFolders
             foreach (var f in FileData.OfType<DirectoryDescription>().ToList()) 
             {
                 if (FileData.IndexOf(f) == FileData.Count - 1)
